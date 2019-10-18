@@ -1,12 +1,269 @@
-import math
-import os
 
-import PIL
+from functools import wraps
+import PIL.Image
+from PIL.Image import isImageType
+from PIL import ImageDraw
 import numpy.random as random
+from pathlib import Path
+import lorem_ipsum
+import textwrap
+import logging
+from abc import ABC, abstractmethod
+from spoiler import BaseComponent, Visitor, Background, Foreground, spoil, filters_from_cfg
+from typing import List
 
 
-from spoiler import spoil
+class Component(BaseComponent):
 
+    def __init__(self, size, background_color=(255,255,255)):
+        if len(background_color)> 1:
+            color_space = 'RGBA'
+        else:
+            color_space = 'L'
+        self._img=PIL.Image.new(color_space, size, background_color)
+        self.elements = []
+
+    def __getattr__(self, item):
+        attr = object.__getattribute__(self._img, item)
+        if hasattr(attr, '__call__'):
+            @wraps(attr)
+            def _wrapped(*args, **kwargs):
+                return attr(*args, **kwargs)
+            return _wrapped
+        else:
+            return attr
+
+    def update(self, im):
+        if im is not None and isinstance(im, PIL.Image.Image):
+            self._img = im
+
+
+    def render(self):
+        for el, pos in self.elements:
+            #el.render()
+            self.paste(el.copy(), pos)
+
+    def accept(self, visitor: Visitor):
+        # if visitor.should_visit_leaves():
+        #     for el, _ in self.elements:
+        #         el._img = el.convert('L')
+        #         el.accept(visitor)
+                #el.render()
+        #self.render()
+        visitor.visit(self)
+        #self.render()
+
+
+    def add(self, *items):
+        self.elements.append(tuple(items))
+
+
+
+
+
+
+class TextGroup(Component):
+    font_sizes = [12,14,16,18]
+
+    def __init__(self, size, dataloader=None, fonts=('Arial',) ):
+        super().__init__(size)
+        height = random.choice(TextGroup.font_sizes)
+        font_name = random.choice(fonts)
+        font = PIL.ImageFont.truetype(font_name, height)
+        ascent, descent = font.getmetrics()
+
+        line_height = ascent + descent
+        n_lines = size[1] // line_height
+        start = random.randint(0, max(1,len(lorem_ipsum.text) - n_lines))
+        text = lorem_ipsum.text[start: start + n_lines] #dataloader.get_lines(n_lines)
+        text = '\n'.join(text)
+
+        w_border = random.randint(5, 15)  # %
+        h_border = random.randint(5, 15)
+
+        cropped = (size[0] - int(size[0] * w_border / 100)), (size[1] - int(size[1] * h_border / 100))
+
+        draw = ImageDraw.Draw(self._img)
+        offset = h_border
+        width = font.getsize('A a')[0]
+        width = int(cropped[0]//width*3.5)
+        print(width)
+        for line in textwrap.wrap(text, width=width):
+            if offset + font.getsize(line)[1] > cropped[1]:
+                break
+            draw.text(((size[0]-cropped[0])//2, offset), line, font=font, fill=0)
+            offset += font.getsize(line)[1]
+        #body = Text(size, font, text)
+        #self.paste(body, (0,0))
+        #(width, baseline), (offset_x, offset_y) = font.font.getsize("Placeholder with different letters - gjkxJ")
+
+
+
+class Text(Component):
+    alignments = ['left', 'center', 'right']
+
+    def __init__(self, size, font=PIL.ImageFont.truetype('Arial', 16), txt='Testo Prova   ', cfg=None):
+        super().__init__(size)
+
+        w_border = random.randint(5,15) #  %
+        h_border = random.randint(5,15)
+
+        cropped = (size[0] - int(size[0] * w_border/100)), (size[1] - int(size[1]*h_border/100))
+
+        draw = ImageDraw.Draw(self._img)
+
+        draw.text(((size[0]-cropped[0])/2, (size[1]-cropped[1])//2),txt, font=font, fill=0, align=random.choice(Text.alignments))
+
+
+
+class HeadingStamp(Component):
+    STAMPS = list(Path('../resources/heading_stamps/').glob('*.png'))
+
+    def __init__(self, size):
+        super().__init__(size)
+        stamp = PIL.Image.open(random.choice(HeadingStamp.STAMPS))
+
+        w_border = random.randint(5,15) #  %
+        h_border = random.randint(5,15)
+
+        cropped = (size[0] - int(size[0] * w_border/100)), (size[1] - int(size[1]*h_border/100))
+        stamp_size = stamp.size
+
+        ratio = min(cropped[0]/float(stamp_size[0]), cropped[1]/float(stamp_size[1]))
+
+        new_size = int(stamp_size[0]*ratio), int(stamp_size[1]*ratio)
+
+        self.stamp = stamp.resize(new_size, PIL.Image.ANTIALIAS)
+        #self.stamp.show()
+
+        rand_left = random.randint(0, w_border + cropped[0]-self.stamp.size[0])
+        rand_top = random.randint(0, h_border + cropped[1]-self.stamp.size[1])
+        position = rand_left, rand_top
+
+        self.paste(self.stamp, position)
+
+
+class Header(Component):
+    """
+    |-----------|-------|-----------|
+    |     L     |   C   |     R     |
+    |___________|_______|___________|
+
+    """
+
+    def __init__(self, size):
+        super().__init__(size)
+        width, height = size
+        unit = (width // 5)
+        l = TextGroup((unit * 2, height))
+        c = Text((unit, height))
+        r = HeadingStamp((unit*2, height))
+        self.add(l, (0,0))
+        self.add(c, (unit*2, 0))
+        self.add(r, (unit*3, 0))
+        self.render()
+        self.save('test_header.png')
+
+
+    @staticmethod
+    def random(cfg):
+        p = cfg.get('probability', 50)
+        if random.randint(0, 100) > p :
+            pass
+        else:
+            pass
+
+class Body(Component):
+
+    def __init__(self, size):
+        super().__init__(size)
+        width, height = size
+        unit = (width // 5)
+        l = TextGroup((size[0], size[1]//2))
+        #t = Table
+        c = Text((unit, height))
+        r = HeadingStamp((unit*2, height))
+        self.add(l, (0, 0))
+        self.render()
+        #self.paste(r, (unit*3, 0))
+        self.save('test_body.png')
+
+
+
+class Footer(Component):
+
+    def __init__(self, size):
+        super().__init__(size)
+
+        width, height = size
+        total_units = 20
+        unit = (width // total_units)
+
+        long_el = 7 #  units
+        short_el = 2
+
+        l = Text((unit * long_el, height))
+        c = Text((unit * long_el, height), txt = 'ABCDEFGHIJKLMNOPQRSTUVZ')
+        c_pos = (l.width + random.randint(0, total_units-( long_el*2 + short_el)), 0)
+        r = Text((unit * short_el, height), txt='3/6')
+        r_pos = (self.width - r.width, 0)
+        self.add(l, (0, 0))
+        self.add(c, c_pos)
+        self.add(r, r_pos)
+        self.render()
+    # def render(self):
+    #     for el, pos in self.elements:
+    #         self.paste(el.copy(), pos)
+    #     self.save('test_footer.png')
+
+
+
+        #visitor.visit(self)
+
+
+class Image(Component):
+    def __init__(self, size):
+        super().__init__(size)
+
+        width, height = size
+        total_units = 50
+        available = total_units
+        unit = (height // total_units)
+
+        long_el = 40  # units
+        short_el = 3
+        top_h = random.randint(short_el, short_el*5)
+        top = Header((width, top_h*unit))
+        available -= top_h
+
+        body_h = random.randint(total_units//2, available - short_el)
+        body = Body((width, body_h*unit))
+        available -= body_h
+
+        footer_h = 1 #random.randint(1, 1)
+        footer = Footer((width, footer_h*unit))
+        footer_pos = (0, self.height - footer_h * unit)
+
+        self.add(footer, footer_pos)
+        self.add(top, (0, 0))
+        self.add(body, (0, (top.height + random.randint(0, available*unit))))
+        self.render()
+        #self.paste(footer,footer_pos )
+        #self.save('test_image.png')
+
+
+
+        #visitor.visit(self)
+
+image = Image((800, 1400))
+image.save('test_image.png')
+filters = filters_from_cfg(None)
+for filter in filters:
+    image.accept(filter)
+#el.accept(Background(random.randint(220, 245)))
+#el.accept(Foreground(random.randint(200,255)))
+#image.render()
+image.save('spoil.png')
 
 
 def image(lines, font, line_height=1.2, underline=False):
@@ -30,6 +287,7 @@ def image(lines, font, line_height=1.2, underline=False):
             if underline:
                 draw.line((ws - 1, hs + hb - 1, ws + w, hs + hb - 1))
     return img
+
 
 def load_fonts(path, size=30):
     with open(path) as f:

@@ -1,11 +1,53 @@
+from __future__ import annotations
 import numpy.random as random
 import PIL, PIL.ImageFont, PIL.Image, PIL.ImageDraw, PIL.ImageChops, PIL.ImageOps, PIL.ImageFilter
 import math
+from abc import ABC, abstractmethod
+from typing import List
 
 
-class Filter:
+class BaseComponent(ABC):
+
+    @abstractmethod
+    def accept(self, visitor: Visitor):
+        pass
+
+    @abstractmethod
+    def update(self, val):
+        pass
+
+
+class Visitor(ABC):
+
+    @abstractmethod
+    def visit(self, component : BaseComponent):
+        pass
+
+    @abstractmethod
+    def should_visit_leaves(self):
+        pass
+
+
+class Filter(Visitor):
+
+    def should_visit_leaves(self):
+        return False
+
     def run(self, image):
-        return image
+        pass
+
+    def visit(self, component: BaseComponent):
+        #component.render()
+        component._img = component.convert('L')
+
+        if self.should_visit_leaves():
+            for el, _ in component.elements:
+                self.visit(el)
+            component.render()
+
+        component.update(self.run(component))
+        #component.save('x.png')
+
 
 class Crop(Filter):
     def __init__(self, border=0):
@@ -26,9 +68,10 @@ class Crop(Filter):
         return image.crop(tuple(box))
 
     @staticmethod
-    def random():
+    def from_cfg(cfg):
         return Crop(random.randint(0, 50))
         #return Crop()
+
 
 class Pad(Filter):
     def __init__(self, n):
@@ -36,7 +79,7 @@ class Pad(Filter):
 
     def run(self, image):
         w, h = image.size
-        bg = PIL.Image.new(image.mode, (w + 2 * self.n, h + 2 * self.n), 255)
+        bg = PIL.Image.new(image.mode, (w + 2 * self.n, h + 2 * self.n), 0)
         bg.paste(image, (self.n, self.n))
         return bg
 
@@ -44,6 +87,8 @@ class Pad(Filter):
     def random():
         return Pad(random.randint(2, 5))
 
+    def should_visit_leaves(self):
+        return True
 
 class Rotate(Filter):
     def __init__(self, angle):
@@ -66,16 +111,18 @@ class Rotate(Filter):
 
     @staticmethod
     def random():
-        if random.randint(0, 10) < 7:
-            return Filter()
-        else:
-            return Rotate(random.randint(-3, 3))
+        # if random.randint(0, 10) < 7:
+        #     return Filter()
+        # else:
+        return Rotate(random.randint(-3, 3))
+
 
 def _white_noise(width, height, m=0, M=255):
     pil_map = PIL.Image.new("L", (width, height), 255)
     random_grid = map(lambda x: random.randint(m, M), [0] * width * height)
     pil_map.putdata(list(random_grid))
     return pil_map
+
 
 class Background(Filter):
     def __init__(self, grey):
@@ -86,12 +133,16 @@ class Background(Filter):
         noise = _white_noise(w, h, self.grey, 255)
         return PIL.ImageChops.darker(image, noise)
 
+    def should_visit_leaves(self):
+        return True
+
     @staticmethod
     def random():
-        if random.randint(0, 10) < 7:
-            return Filter()
-        else:
-            return Background(random.randint(220, 245))
+        # if random.randint(0, 10) < 7:
+        #     return Filter()
+        # else:
+        return Background(random.randint(220, 245))
+
 
 class Foreground(Filter):
     def __init__(self, grey):
@@ -102,12 +153,16 @@ class Foreground(Filter):
         noise = _white_noise(w, h, 0, self.grey)
         return PIL.ImageChops.lighter(image, noise)
 
+    def should_visit_leaves(self):
+        return True
+
     @staticmethod
     def random():
-        if random.randint(0, 10) < 6:
-            return Filter()
-        else:
-            return Foreground(random.randint(150, 220))
+        # if random.randint(0, 10) < 6:
+        #     return Filter()
+        # else:
+        return Foreground(random.randint(150, 255))
+
 
 class Blur(Filter):
     def __init__(self, r):
@@ -118,10 +173,13 @@ class Blur(Filter):
 
     @staticmethod
     def random():
-        if random.randint(0, 10) < 8:
-            return Filter()
-        else:
-            return Blur(1)
+        # if random.randint(0, 10) < 8:
+        #     return Filter()
+        # else:
+        return Blur(1)
+
+    def should_visit_leaves(self):
+        return True
 
 class Stroke(Filter):
     def __init__(self, num_signs, num_strokes, step):
@@ -144,15 +202,19 @@ class Stroke(Filter):
 
     def run(self, image):
         for _ in range(self.num_signs):
-            self.draw_sign(image)
+            self.draw_sign(image._img)
         return image
+
+    def should_visit_leaves(self):
+        return True
 
     @staticmethod
     def random():
-        if random.randint(0, 10) < 7:
-            return Filter()
-        else:
-            return Stroke(random.randint(1, 4), random.randint(3, 10), random.randint(5, 20))
+        # if random.randint(0, 10) < 7:
+        #     return Filter()
+        # else:
+        return Stroke(random.randint(1, 4), random.randint(3, 10), random.randint(5, 20))
+
 
 class Overlay(Filter):
     def __init__(self, overlay, size):
@@ -167,7 +229,6 @@ class Overlay(Filter):
         bg.paste(self.overlay, (w1, h1))
         return bg
 
-
     def run(self, image):
         overlay = self.pad_overlay_at(image.size)
         return PIL.ImageChops.darker(image, overlay)
@@ -179,12 +240,12 @@ class Overlay(Filter):
     @staticmethod
     def random(dir, size):
         import os
-        if random.randint(0, 10) < 7:
-            return Filter()
-        else:
-            file = random.choice(os.listdir(dir))
-            full_path = os.path.join(dir, file)
-            return Overlay.open(full_path, size)
+        # if random.randint(0, 10) < 7:
+        #     return Filter()
+        # else:
+        file = random.choice(os.listdir(dir))
+        full_path = os.path.join(dir, file)
+        return Overlay.open(full_path, size)
 
 
 class VerticalLine(Filter):
@@ -194,7 +255,7 @@ class VerticalLine(Filter):
             a = random.randint(0, h // 8)
             b = h - random.randint(0, h // 8)
             x = random.randint(0, w)
-            draw = PIL.ImageDraw.Draw(image.copy())
+            draw = PIL.ImageDraw.Draw(image)
             draw.line((x, a, x, b), fill=30, width=4)
         except Exception as e:
             print(e)
@@ -204,10 +265,10 @@ class VerticalLine(Filter):
     @staticmethod
     def random():
         import os
-        if random.randint(0, 10) < 9:
-            return Filter()
-        else:
-            return VerticalLine()
+        # if random.randint(0, 10) < 9:
+        #     return Filter()
+        # else:
+        return VerticalLine()
 
 
 class Gradient(Filter):
@@ -234,7 +295,7 @@ class Gradient(Filter):
         for x in range(side):
             a = int((self.INITIAL_VAL * 255.) * (1. - self.gradient_mg * float(x) / side))
             # gradient.putpixel((x, 0), 255-x)
-            #gradient.putpixel((x, 0), int(255 * (1 - self.gradient_mg * float(x) / side)))
+            # gradient.putpixel((x, 0), int(255 * (1 - self.gradient_mg * float(x) / side)))
             if a < 0:
                 a = 0
             if self.direction:
@@ -250,20 +311,34 @@ class Gradient(Filter):
 
     @staticmethod
     def random():
-        if random.randint(0, 10) < 7:
-            return Filter()
-        else:
-            grad = random.randint(1, 10)
-            dir = random.randint(0, 1)
-            color = random.randint(0, 100)
-            return Gradient(grad/10, dir, color)
+        # if random.randint(0, 10) < 7:
+        #     return Filter()
+        # else:
+        grad = random.randint(1, 10)
+        dir = random.randint(0, 1)
+        color = random.randint(0, 100)
+        return Gradient(grad/10, dir, color)
 
+def filters_from_cfg(cfg):
+    filters = [
+
+        #Rotate.random() if not cfg.no_skew else Filter(),
+        Pad.random(),
+        Background.random(),
+        Foreground.random(),
+        Blur.random(),
+        Stroke.random(),
+        VerticalLine.random(),
+        Overlay.random('../resources/stamps', (100, 100)),
+        Gradient.random()
+    ]
+    return filters
 
 def spoil(im, options):
     im = Crop.random().run(im)
     filters = [
         VerticalLine.random(),
-        Overlay.random('stamps', (100, 100)),
+        Overlay.random('../resources/stamps', (100, 100)),
         Rotate.random() if not options.no_skew else Filter(),
         # Pad.random(),
         Background.random(),
