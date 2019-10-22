@@ -4,28 +4,7 @@ import PIL, PIL.ImageFont, PIL.Image, PIL.ImageDraw, PIL.ImageChops, PIL.ImageOp
 import math
 from abc import ABC, abstractmethod
 from typing import List
-
-
-class BaseComponent(ABC):
-
-    @abstractmethod
-    def accept(self, visitor: Visitor):
-        pass
-
-    @abstractmethod
-    def update(self, val):
-        pass
-
-
-class Visitor(ABC):
-
-    @abstractmethod
-    def visit(self, component : BaseComponent):
-        pass
-
-    @abstractmethod
-    def should_visit_leaves(self):
-        pass
+from images import BaseComponent, Visitor, HeadingStamp, Image
 
 
 class Filter(Visitor):
@@ -90,6 +69,7 @@ class Pad(Filter):
     def should_visit_leaves(self):
         return True
 
+
 class Rotate(Filter):
     def __init__(self, angle):
         self.angle = angle
@@ -105,16 +85,23 @@ class Rotate(Filter):
         return ((W - w1) // 2, (H - h1) // 2, (W - w1) // 2 + w1, (H - h1) // 2 + h1)
 
     def run(self, image):
-        rotated = Pad(100).run(image).rotate(self.angle, expand=False)
-        box = self.center_box(rotated.size, image.size)
-        return rotated.crop(box)
+        if isinstance(image, HeadingStamp):
+            #rotated = Pad(100).run(image).convert('RGBA').rotate(self.angle, expand = 1)
+            rotated = image.convert('RGBA').rotate(self.angle, expand=1, fillcolor='white')
+            box = self.center_box(rotated.size, image.size)
+            return rotated.crop(box)
+        else:
+            return image
+
+    def should_visit_leaves(self):
+        return True
 
     @staticmethod
     def random():
         # if random.randint(0, 10) < 7:
         #     return Filter()
         # else:
-        return Rotate(random.randint(-3, 3))
+        return Rotate(random.randint(-10, 10   ))
 
 
 def _white_noise(width, height, m=0, M=255):
@@ -201,6 +188,8 @@ class Stroke(Filter):
             position = new_position
 
     def run(self, image):
+        if any(dim < 200 for dim in image.size):
+            return image
         for _ in range(self.num_signs):
             self.draw_sign(image._img)
         return image
@@ -213,7 +202,7 @@ class Stroke(Filter):
         # if random.randint(0, 10) < 7:
         #     return Filter()
         # else:
-        return Stroke(random.randint(1, 4), random.randint(3, 10), random.randint(5, 20))
+        return Stroke(random.randint(1, 6), random.randint(3, 14), random.randint(10, 50))
 
 
 class Overlay(Filter):
@@ -277,7 +266,7 @@ class Gradient(Filter):
         self.direction = direction
         self.color = color
 
-    INITIAL_VAL = 0.8
+    INITIAL_VAL = 0.9
 
     def run(self, image):
         if image.mode != 'RGBA':
@@ -316,14 +305,14 @@ class Gradient(Filter):
         # else:
         grad = random.randint(1, 10)
         dir = random.randint(0, 1)
-        color = random.randint(0, 100)
+        color = random.randint(100, 200)
         return Gradient(grad/10, dir, color)
 
 def filters_from_cfg(cfg):
     filters = [
 
-        #Rotate.random() if not cfg.no_skew else Filter(),
-        Pad.random(),
+        Rotate.random(),
+        #Pad.random(),
         Background.random(),
         Foreground.random(),
         Blur.random(),
@@ -345,7 +334,7 @@ def spoil(im, options):
         Foreground.random(),
         Stroke.random(),
         Blur.random(),
-        Gradient.random()
+        #Gradient.random()
     ]
 
     noisy = im

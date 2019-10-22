@@ -1,7 +1,8 @@
 import random
 import argparse
 import os
-from images import random_image, load_fonts
+from images import Image #random_image, load_fonts
+from spoiler import filters_from_cfg
 
 
 def parse_options():
@@ -23,26 +24,43 @@ def main():
     options = parse_options()
     #fonts = load_fonts(options.fonts, size=15)
     fonts=[]
-    with open(options.text) as f:
-        lines = f.readlines()
+    #with open(options.text) as f:
+        #lines = f.readlines()
+
+    if options.gen_truth:
+        os.makedirs(f"{options.dir}/GT", exist_ok=True)
 
     for i in range(options.size):
-        text, noisy, im = random_image(lines, fonts, options)
+        print(i, end='\r')
+        #im =
+       # text, noisy, im = random_image(lines, fonts, options)
         text_file = '%s/%04d.txt' % (options.dir, i)
         img_file = '%s/%04d.png' % (options.dir, i)
         truth_file = '%s/GT/%04d_GT.png' % (options.dir, i)
-        if options.gen_truth:
-            os.makedirs(f"{options.dir}/GT", exist_ok=True)
-        if not options.gen_truth:
 
+        image = Image((1300, 2000))
+        if options.gen_truth:
+            image.save(truth_file, dpi=(300,300))
+
+        filters = filters_from_cfg(None)
+
+        for filter in filters:
+            image.accept(filter)
+        # el.accept(Background(random.randint(220, 245)))
+        # el.accept(Foreground(random.randint(200,255)))
+        # image.render()
+        image.save(img_file, dpi=(options.dpi, options.dpi) )
+
+
+        if not options.gen_truth:
+            text_visitor = None
+            text = image.accept(text_visitor)
             with open(text_file, 'w') as f:
                 f.write(text)
 
-        noisy.save(img_file, dpi=(options.dpi, options.dpi))
-        if options.gen_truth:
-            im.save(truth_file, dpi=(300,300))
+
         #im.save(img_file)
-        print(i, end='\r')
+
 
 if __name__ == '__main__':
     main()
