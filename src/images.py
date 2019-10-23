@@ -3,6 +3,7 @@ from functools import wraps
 import PIL.Image
 from PIL.Image import isImageType
 from PIL import ImageDraw
+import numpy as np
 import numpy.random as random
 from pathlib import Path
 import lorem_ipsum
@@ -11,7 +12,8 @@ import logging
 # from tablegen import Tablegen
 from abc import ABC, abstractmethod
 from tablegen import Tablegen
-
+import inspect
+import logging
 from typing import List
 
 
@@ -85,22 +87,78 @@ class Component(BaseComponent):
             #el.render()
             self.paste(el.copy(), pos)
 
-
-
-
     def add(self, *items):
         self.elements.append(tuple(items))
 
 
+class Generator:
+    def __init__(self, opt):
+        node = opt[self.__class__.__name__]
+        self.node = node
+        self.sizes = get_sizes(node)
+        self.generators = get_components(node, opt)
 
+    def __str__(self):
+        return self.__class__.__name__
 
+    def generate(self, container_size=None):
 
+        size = next(self.sizes)
 
-class TextGroup(Component):
-    font_sizes = [16,18,20, 22, 24]
+        if container_size is not None:
+            size = [int(dim * size[i]) for i, dim in enumerate(container_size)]
+        size = int(size[0]), int(size[1])
+        img = Component(size)
+        available_x, available_y = width, height = size
+        # total_units = 100
+        # unit = (height // total_units)
 
-    def __init__(self, size, dataloader=None, fonts=('Arial',) ):
-        super().__init__(size)
+        for i, gen in enumerate(self.generators):
+            component = gen.generate(size)
+            available_x -= component.width
+            available_y -= component.height
+            self.generators[i] = (gen, component)
+
+        # assert available_x >= 0
+        # assert available_y >= 0
+
+        available_x = 0
+        available_y = 0
+        for gen, im in self.generators:
+
+            node = gen.node
+            x_minmax, y_minmax = get_position_range(node)
+            baseline_x = int(width*x_minmax[MIN])
+            baseline_y = int(height*y_minmax[MIN])
+            max_x = int(x_minmax[MAX]*width+1)
+            max_y = int(y_minmax[MAX]*height+1)
+            try:
+                x = np.random.randint(baseline_x, min(baseline_x+available_x, max_x)+1)
+                y = np.random.randint(baseline_y, min(baseline_y+available_y, max_y)+1)
+            except ValueError as e:
+                print("Illegal configuration (position")
+                continue
+
+            if x+im.width > size[0] or y + im.height > size[1]:
+                logging.warning("Placing Component outside image range")
+
+            # available_x -= x - baseline_x
+            # available_y -= y - baseline_y
+
+            img.add(im, (x,y))
+
+        img.render()
+        return img
+
+class TextGroup(Generator):
+    font_sizes = [18,20, 22, 24]
+
+    def generate(self, container_size=None, dataloader=None, fonts=('Arial',) ):
+
+        factors = next(self.sizes)
+        size = [int(dim*factors[i]) for i, dim in enumerate(container_size)]
+
+        img = Component(size)
         height = random.choice(TextGroup.font_sizes)
         font_name = random.choice(fonts)
         font = PIL.ImageFont.truetype(font_name, height)
@@ -117,7 +175,7 @@ class TextGroup(Component):
 
         cropped = (size[0] - int(size[0] * w_border / 100)), (size[1] - int(size[1] * h_border / 100))
 
-        draw = ImageDraw.Draw(self._img)
+        draw = ImageDraw.Draw(img)
         offset = h_border
         width = font.getsize('A a')[0]
         width = int(cropped[0]//width*3.5)
@@ -126,6 +184,7 @@ class TextGroup(Component):
                 break
             draw.text(((size[0]-cropped[0])//2, offset), line, font=font, fill=0)
             offset += font.getsize(line)[1]
+        return img
         #body = Text(size, font, text)
         #self.paste(body, (0,0))
         #(width, baseline), (offset_x, offset_y) = font.font.getsize("Placeholder with different letters - gjkxJ")
@@ -149,13 +208,17 @@ class Text(Component):
 
 
 
-class HeadingStamp(Component):
-    STAMPS = list(Path('../resources/heading_stamps/').glob('*.png'))
+class HeadingStamp(Generator):
+    STAMPS = list(Path('resources/heading_stamps/').glob('*.png'))
 
-    def __init__(self, size):
-        super().__init__(size)
+    def generate(self, container_size):
         stamp = PIL.Image.open(random.choice(HeadingStamp.STAMPS))
 
+        factors = next(self.sizes)
+        size = [int(dim * factors[i]) for i, dim in enumerate(container_size)]
+
+        img = Component(size)
+        height = random.choice(TextGroup.font_sizes)
         w_border = random.randint(5,15) #  %
         h_border = random.randint(5,15)
 
@@ -173,18 +236,23 @@ class HeadingStamp(Component):
         rand_top = random.randint(0, h_border + cropped[1]-self.stamp.size[1])
         position = rand_left, rand_top
 
-        self.paste(self.stamp, position)
+        img.paste(self.stamp, position)
+        return img
 
 
-class Header(Component):
+class Header(Generator):
     """
     |-----------|-------|-----------|
     |     L     |   C   |     R     |
     |___________|_______|___________|
 
     """
+    def __init__(self, opt):
+        self.sizes = get_sizes(opt)
 
-    def __init__(self, size):
+        self.elements = get_components(opt, opt)
+
+    def generate(self, size):
         super().__init__(size)
         width, height = size
         unit = (width // 10)
@@ -207,7 +275,7 @@ class Header(Component):
             pass
 
 class Table(Component):
-    def __init__(self, size):
+    def generate(self, size):
         super().__init__(size)
 
         w_border = random.randint(5, 15)  # %
@@ -267,50 +335,119 @@ class Footer(Component):
     #     self.save('test_footer.png')
 
 
-
+fn_map = {'uniform': np.random.uniform,
+          'normal': np.random.normal}
         #visitor.visit(self)
+SAMPLES = 500
+
+def get_sizes(node):
+    size = node['size']
+    width = size.get('width', 1)
+    height = size.get('height', 1)
+    distribution = size.get('distribution', 'uniform')
+    pdf = fn_map[distribution]
+    if isinstance(width, list):
+        assert(len(width) == 2)
+        ws = pdf(*width, SAMPLES)
+    else:
+        ws = np.full(SAMPLES, fill_value=width)
+
+    if isinstance(height, list):
+        assert (len(height) == 2)
+        hs = pdf(*height, SAMPLES)
+    else:
+        hs = np.full(SAMPLES, fill_value=height)
+    return zip(ws, hs)
 
 
-class Image(Component):
-    def __init__(self, size):
-        super().__init__(size)
-
-        width, height = size
-        total_units = 100
-        available = total_units
-        unit = (height // total_units)
-
-        long_el = 80  # units
-        short_el = 6
-        top_h = random.randint(short_el, short_el*5)
-        top = Header((width, top_h*unit))
-        available -= top_h
-
-        body_h = random.randint(total_units//2, available - short_el)
-        if random.randint(0,2) < 1:
-            body = Table((width, body_h*unit))
+def get_components(node, opt):
+    elements = node.get('elements', None)
+    if elements is None:
+        return []
+    import sys
+    local_classes = inspect.getmembers(sys.modules[__name__], inspect.isclass)
+    local_classes = {name: cls for name, cls in local_classes
+                     if name not in ['BaseComponent', 'ABC'] and not inspect.isabstract(cls)}
+    objects = []
+    for el in elements:
+        class_name = list(el.keys())[0]
+        if class_name in local_classes.keys():
+            cls = local_classes[class_name]
+            objects.append(cls(el))
 
         else:
-            body = Body((width, body_h*unit))
+            raise AttributeError("error instantiating element", el)
 
-        available -= body_h
-
-        footer_h = 1 #random.randint(1, 1)
-        footer = Footer((width, footer_h*unit))
-        footer_pos = (0, self.height - footer_h * unit)
-
-        self.add(top, (0, 0))
-        self.add(body, (0, (top.height + random.randint(0, available*unit))))
-        self.add(footer, footer_pos)
-
-        self.render()
-        #self.paste(footer,footer_pos )
-        #self.save('test_image.png')
+    return objects
 
 
+def get_position_range(node):
+    position = node.get('position', dict())
+    x = position.get('x', [0, 1])
+    y = position.get('y', [0, 1])
+    distribution = position.get('distribution', dict()).get('type', 'uniform')
+    if not isinstance(x, list):
+        x = [x,x]
 
-        #visitor.visit(self)
+    if not isinstance(y, list):
+        y = [y,y]
 
+    return x, y
+
+
+MIN = 0
+MAX = 1
+
+class Image(Generator):
+
+    def generate(self, container_size=None):
+        super().generate(container_size)
+
+    # def generate(self, container_size=None):
+    #
+    #     size = next(self.sizes)
+    #     size = int(size[0]), int(size[1])
+    #     img = Component(size)
+    #     available_x, available_y = width, height = size
+    #     # total_units = 100
+    #     # unit = (height // total_units)
+    #
+    #     for i, gen in enumerate(self.generators):
+    #         component = gen.generate(size)
+    #         available_x -= component.width
+    #         available_y -= component.height
+    #         self.generators[i] = (gen, component)
+    #
+    #     assert available_x >= 0
+    #     assert available_y >= 0
+    #
+    #     available_x += 1
+    #     available_y += 1
+    #     for gen, im in self.generators:
+    #
+    #         node = gen.node
+    #         x_minmax, y_minmax = get_position_range(node)
+    #         baseline_x = int(width*x_minmax[MIN])
+    #         baseline_y = int(height*y_minmax[MIN])
+    #         max_x = int(x_minmax[MAX]*width+1)
+    #         max_y = int(y_minmax[MAX]*height+1)
+    #         try:
+    #             x = np.random.randint(baseline_x, min(baseline_x+available_x, max_x))
+    #             y = np.random.randint(baseline_y, min(baseline_y+available_y, max_y))
+    #         except ValueError as e:
+    #             print("Illegal configuration (position")
+    #             continue
+    #
+    #         if x+im.width > size[0] or y + im.height > size[1]:
+    #             logging.warning("Placing Component outside image range")
+    #
+    #         available_x -= x - baseline_x
+    #         available_y -= y - baseline_y
+    #
+    #         img.add(im, (x,y))
+    #
+    #     img.render()
+    #     return img
 
 
 

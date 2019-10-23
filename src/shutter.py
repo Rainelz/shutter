@@ -1,12 +1,13 @@
 import random
 import argparse
 import os
-from images import Image #random_image, load_fonts
+from images import Generator #random_image, load_fonts
 from spoiler import filters_from_cfg
-
+import yaml
 
 def parse_options():
     parser = argparse.ArgumentParser(description='Generated text and images.')
+    parser.add_argument('--config', required=True, help='path to YAML config file')
     parser.add_argument('--fonts', required=False, help='path of the list of fonts')
     parser.add_argument('--text', required=True, help='path of the text file')
     parser.add_argument('--dir', required=True, help='path of the output directory')
@@ -22,6 +23,13 @@ def parse_options():
 
 def main():
     options = parse_options()
+
+    with open(options.config, 'r') as stream:
+        try:
+            opt = yaml.safe_load(stream)
+        except yaml.YAMLError as exc:
+            print(exc)
+
     #fonts = load_fonts(options.fonts, size=15)
     fonts=[]
     #with open(options.text) as f:
@@ -38,7 +46,8 @@ def main():
         img_file = '%s/%04d.png' % (options.dir, i)
         truth_file = '%s/GT/%04d_GT.png' % (options.dir, i)
 
-        image = Image((1300, 2000))
+        image_generator = Generator(opt)
+        image = image_generator.generate()
         if options.gen_truth:
             image.save(truth_file, dpi=(300,300))
 

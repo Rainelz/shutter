@@ -318,7 +318,7 @@ def filters_from_cfg(cfg):
         Blur.random(),
         Stroke.random(),
         VerticalLine.random(),
-        Overlay.random('../resources/stamps', (100, 100)),
+        Overlay.random('resources/stamps', (100, 100)),
         Gradient.random()
     ]
     return filters
@@ -327,7 +327,7 @@ def spoil(im, options):
     im = Crop.random().run(im)
     filters = [
         VerticalLine.random(),
-        Overlay.random('../resources/stamps', (100, 100)),
+        Overlay.random('resources/stamps', (100, 100)),
         Rotate.random() if not options.no_skew else Filter(),
         # Pad.random(),
         Background.random(),
