@@ -9,6 +9,7 @@ pylint = "*"
 [packages]
 pillow = "*"
 lorem = "*"
+numpy = "*"
 
 [requires]
 python_version = "3.7"

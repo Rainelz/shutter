@@ -4,10 +4,11 @@ import PIL, PIL.ImageFont, PIL.Image, PIL.ImageDraw, PIL.ImageChops, PIL.ImageOp
 import math
 from abc import ABC, abstractmethod
 from typing import List
-from images import BaseComponent, Visitor, HeadingStamp, Image
+from images import BaseComponent, Visitor, Image
 
 
 class Filter(Visitor):
+    """Implements basic filter behaviour"""
 
     def should_visit_leaves(self):
         return False
@@ -16,7 +17,6 @@ class Filter(Visitor):
         pass
 
     def visit(self, component: BaseComponent):
-        #component.render()
         component._img = component.convert('L')
 
         if self.should_visit_leaves():
@@ -25,7 +25,6 @@ class Filter(Visitor):
             component.render()
 
         component.update(self.run(component))
-        #component.save('x.png')
 
 
 class Crop(Filter):
@@ -85,7 +84,7 @@ class Rotate(Filter):
         return ((W - w1) // 2, (H - h1) // 2, (W - w1) // 2 + w1, (H - h1) // 2 + h1)
 
     def run(self, image):
-        if isinstance(image, HeadingStamp):
+        if isinstance(image, Image):
             #rotated = Pad(100).run(image).convert('RGBA').rotate(self.angle, expand = 1)
             rotated = image.convert('RGBA').rotate(self.angle, expand=1, fillcolor='white')
             box = self.center_box(rotated.size, image.size)
@@ -312,7 +311,7 @@ def filters_from_cfg(cfg):
     filters = [
 
         Rotate.random(),
-        #Pad.random(),
+        Pad.random(),
         Background.random(),
         Foreground.random(),
         Blur.random(),

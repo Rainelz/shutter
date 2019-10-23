@@ -29,6 +29,7 @@ def main():
             opt = yaml.safe_load(stream)
         except yaml.YAMLError as exc:
             print(exc)
+            exit(1)
 
     #fonts = load_fonts(options.fonts, size=15)
     fonts=[]
@@ -38,6 +39,8 @@ def main():
     if options.gen_truth:
         os.makedirs(f"{options.dir}/GT", exist_ok=True)
 
+    image_generator = Generator(opt)
+
     for i in range(options.size):
         print(i, end='\r')
         #im =
@@ -46,7 +49,6 @@ def main():
         img_file = '%s/%04d.png' % (options.dir, i)
         truth_file = '%s/GT/%04d_GT.png' % (options.dir, i)
 
-        image_generator = Generator(opt)
         image = image_generator.generate()
         if options.gen_truth:
             image.save(truth_file, dpi=(300,300))
