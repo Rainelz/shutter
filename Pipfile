@@ -5,11 +5,14 @@ verify_ssl = true
 
 [dev-packages]
 pylint = "*"
+matplotlib = "*"
 
 [packages]
-pillow = "*"
 lorem = "*"
 numpy = "*"
+pyyaml = "*"
+pillow = "*"
+scipy = "*"
 
 [requires]
 python_version = "3.7"

@@ -1,15 +1,27 @@
-import random
+import numpy.random as random
 import argparse
-import os
+import os, logging, sys
+
+import yaml
+
+
 from images import Generator #random_image, load_fonts
 from spoiler import filters_from_cfg
-import yaml
+
+def config_logger():
+    logger = logging.getLogger()
+    logger.setLevel(logging.DEBUG)
+    formatter = logging.Formatter('%(asctime)s %(levelname)s - [%(threadName)s] %(message)s')
+    stdout_handler = logging.StreamHandler(sys.stdout)
+    stdout_handler.setFormatter(formatter)
+    stdout_handler.setLevel(logging.INFO)
+    logger.addHandler(stdout_handler)
 
 def parse_options():
     parser = argparse.ArgumentParser(description='Generated text and images.')
     parser.add_argument('--config', required=True, help='path to YAML config file')
     parser.add_argument('--fonts', required=False, help='path of the list of fonts')
-    parser.add_argument('--text', required=True, help='path of the text file')
+    #parser.add_argument('--text', required=True, help='path of the text file')
     parser.add_argument('--dir', required=True, help='path of the output directory')
     parser.add_argument('--size', type=int, default=100, help='how many examples to generate')
     parser.add_argument('--no-filters', type=bool, default=False, help='Don\'t apply filters')
@@ -23,12 +35,12 @@ def parse_options():
 
 def main():
     options = parse_options()
-
+    config_logger()
     with open(options.config, 'r') as stream:
         try:
             opt = yaml.safe_load(stream)
         except yaml.YAMLError as exc:
-            print(exc)
+            logging.exception(exc)
             exit(1)
 
     #fonts = load_fonts(options.fonts, size=15)
@@ -38,11 +50,17 @@ def main():
 
     if options.gen_truth:
         os.makedirs(f"{options.dir}/GT", exist_ok=True)
+    seed = opt['Generator'].get('seed', None)
+    if not seed:
+        seed = random.randint(0, 2**32-1)
 
+    logging.info(f"Starting generation with seed {seed} ")
+
+    random.seed(seed)
     image_generator = Generator(opt)
 
     for i in range(options.size):
-        print(i, end='\r')
+        logging.info(i)
         #im =
        # text, noisy, im = random_image(lines, fonts, options)
         text_file = '%s/%04d.txt' % (options.dir, i)
@@ -56,7 +74,8 @@ def main():
         filters = filters_from_cfg(None)
 
         for filter in filters:
-            image.accept(filter)
+            pass
+            #image.accept(filter)
         # el.accept(Background(random.randint(220, 245)))
         # el.accept(Foreground(random.randint(200,255)))
         # image.render()

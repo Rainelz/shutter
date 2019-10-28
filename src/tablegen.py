@@ -1,6 +1,7 @@
 from PIL import Image, ImageDraw, ImageFont
-import random
+#import random
 import numpy as np
+import numpy.random as random
 import time
 #from lorem.text import TextLorem
 import lorem
@@ -9,7 +10,6 @@ import string
 import xml.etree.ElementTree as ET
 import os
 import math
-import cv2
 
 class Tablegen():
     
@@ -33,7 +33,7 @@ class Tablegen():
         self.base_font = self.height//80
         self.min_font = self.height//90
         self.min_tabletop = self.height//75
-        self.pad_minfont = int(abs(np.random.normal(0,8)))
+        self.pad_minfont = int(abs(random.normal(0,8)))
         # ---
         
         # --- can be loaded from a json file
@@ -192,8 +192,9 @@ class Tablegen():
             if random.randint(0,100) < 70:
                 out = str(random.randint(23,499))+','+ '{:0>2d}'.format(random.randint(0,99))
             else:
-                lent = int(abs(np.random.normal(3,5)))
-                out = ''.join(random.choice(string.ascii_letters) for x in range(lent))       
+                lent = int(abs(random.normal(3,5)))
+                chars = random.choice(list(string.ascii_letters), lent)
+                out = ''.join(chars)
             cnt+=1
             go_len = font.getsize(out)[0] > rect[2]
         
@@ -244,14 +245,14 @@ class Tablegen():
                 numlen = font_large.getsize(num)[0]
                 
                 # decide where to put the top and the bottom parts
-                p_top = np.random.uniform(0,1)
+                p_top = random.uniform(0,1)
                 if p_top < self.config['p_left']:
                     xpostop = rect[0]+5
                 if p_top > 1-self.config['p_right']:
                     xpostop = rect[0]+rect[2]-toplen-5
                 else:
                     xpostop = rect[0]+rect[2]//2 - toplen//2-10
-                p_num = np.random.uniform(0,1)
+                p_num = random.uniform(0,1)
                 if p_num < self.config['p_left']:
                     xposnum = rect[0]+5
                 if p_num > 1-self.config['p_right']:
@@ -273,7 +274,7 @@ class Tablegen():
                 if np.random.uniform() < 0.5:
                     num = str(random.randint(0,499))+','+ '{:0>2d}'.format(random.randint(0,99))
                 else:
-                    num = ''.join(random.choice(string.ascii_letters) for x in range(random.randint(2,6)))
+                    num = ''.join(random.choice(list(string.ascii_letters),random.randint(2,6)))
                 
                 num = self.gen_celltext(font_tcell,rect)
                 #num = str(random.randint(23,499))+','+ '{:0>2d}'.format(random.randint(0,99))
@@ -291,7 +292,7 @@ class Tablegen():
         if mode == 'cell':
             
             p_cellHasText = self.config['p_cellhastext']
-            cell_style = np.random.uniform(0,1)
+            cell_style = random.uniform(0,1)
             
             if cell_style <= (1-p_cellHasText): # very likely
 
@@ -300,7 +301,7 @@ class Tablegen():
                     num = self.gen_celltext(font_large, rect)
                     draw.text((rect[0]+5,rect[1]+rect[3]-line_height_large),num,0,font=font_large)
                 else:
-                    shift_up = random.randint(0,line_height_large//2)
+                    shift_up = random.randint(0,line_height_large//2+1)
                     idx = random.randint(0,len(text_heads)-1)
                     draw.text((rect[0]+5,rect[1]+rect[3]//2-line_height_large//2+shift_up),text_heads[idx],0,font=font_large)
                     num = self.gen_celltext(font_large, rect)
@@ -328,10 +329,10 @@ class Tablegen():
         #borders = ['full','horizontal','vertical']
         #border = borders[random.randint(0,2)]
         
-        if np.random.uniform(0,1) < self.config['p_verticalsep_cells']:
+        if random.uniform(0,1) < self.config['p_verticalsep_cells']:
             border = 'full'
         else:
-            if np.random.uniform(0,1) < 0.5:
+            if random.uniform(0,1) < 0.5:
                 border = 'horizontal'
             else:
                 border = 'vertical'
@@ -415,7 +416,7 @@ class Tablegen():
             im = self.split2(im,rect_right,lev+1, max_lev) # right
         else:
             # split horizontally
-            ycoord = random.randint(0,rect[3])
+            #ycoord = random.randint(0,rect[3])
             ycoord = abs(int(np.random.normal(rect[3]//2,20)))
             #ycoord = rect[3]//2
             rect_up = (rect[0], rect[1], rect[2], ycoord)  
@@ -439,7 +440,7 @@ class Tablegen():
         if top:
             cell_size = rect[2]//n_cols
             pad = 0
-            keep_text = abs(np.random.normal(0,1))
+            keep_text = abs(random.normal(0,1))
             for z in range(0,n_cols):
 
                 height_top = max(self.min_tabletop,int(0.03*rect[3]))
@@ -458,7 +459,7 @@ class Tablegen():
 
         pad_height = 0
 
-        keep_text = abs(np.random.normal(0,1))
+        keep_text = abs(random.normal(0,1))
         for r in range(0,n_rows):
             if r == n_rows-1:
                     pad_height = rect[3]-cell_height*n_rows
@@ -472,12 +473,12 @@ class Tablegen():
                 if c == n_cols-1:
                     pad_width = rect[2]-cell_width*n_cols
 
-                border = ('vertical' if np.random.uniform(0,1) < self.config['p_verticalsep_cells'] else 'full')
+                border = ('vertical' if random.uniform(0,1) < self.config['p_verticalsep_cells'] else 'full')
                 
-                if np.random.uniform(0,1) < self.config['p_verticalsep_cells']:
+                if random.uniform(0,1) < self.config['p_verticalsep_cells']:
                     border = 'vertical'
                 else:
-                    if np.random.uniform(0,1) < 0.5:
+                    if random.uniform(0,1) < 0.5:
                         border = 'full'
                     else:
                         border = 'horizontal'
@@ -497,8 +498,8 @@ class Tablegen():
         max_rows = rect[3]//20
         max_cols = rect[2]//100
 
-        n_rows = max(min(max_rows,int(np.random.normal(self.config['avg_rows'],2))),min_rows)
-        n_cols = max(min(max_cols,int(np.random.normal(self.config['avg_cols'],2))),min_cols)
+        n_rows = max(min(max_rows,int(random.normal(self.config['avg_rows'],2))),min_rows)
+        n_cols = max(min(max_cols,int(random.normal(self.config['avg_cols'],2))),min_cols)
 
         return n_rows, n_cols
 
@@ -513,10 +514,10 @@ class Tablegen():
             im = self.rect_draw(im, rect)
 
             p_tableup = self.config['p_tableup']
-            up_val = np.random.uniform(0.2,0.4)
-            down_val = np.random.uniform(0.6,0.8)
-            cut_up = int(np.random.normal(rect[3]*up_val,20))
-            cut_down = int(np.random.normal(rect[3]*down_val,40))
+            up_val = random.uniform(0.2,0.4)
+            down_val = random.uniform(0.6,0.8)
+            cut_up = int(random.normal(rect[3]*up_val,20))
+            cut_down = int(random.normal(rect[3]*down_val,40))
 
             height_up = cut_up
             height_down = rect[3]-cut_down
