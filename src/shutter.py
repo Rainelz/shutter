@@ -58,6 +58,7 @@ def main():
 
     random.seed(seed)
     image_generator = Generator(opt)
+    filters = filters_from_cfg(None)
 
     for i in range(options.size):
         logging.info(i)
@@ -71,10 +72,9 @@ def main():
         #if options.gen_truth:
         image.save(truth_file, dpi=(300,300))
 
-        filters = filters_from_cfg(None)
+        logging.info("Generated Image. Applying spoilers")
 
         for filter in filters:
-            pass
             image.accept(filter)
         # el.accept(Background(random.randint(220, 245)))
         # el.accept(Foreground(random.randint(200,255)))

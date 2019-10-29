@@ -24,6 +24,7 @@ class Filter(Visitor):
         if self.__class__.__name__ in component.spoilers:
             component._img = component.convert('L')
             component.update(self.run(component))
+
         # if self.__class__.__name__ in component.spoilers:
         # component._img = component.convert('L')
         #
@@ -317,16 +318,15 @@ class Gradient(Filter):
 
 def filters_from_cfg(cfg):
     filters = [
-
-        Rotate.random(),
         Pad.random(),
-        Background.random(),
         Foreground.random(),
         Blur.random(),
         Stroke.random(),
         VerticalLine.random(),
         Overlay.random('resources/stamps', (100, 100)),
-        Gradient.random()
+        Gradient.random(),
+        Rotate.random(),
+        Background.random()
     ]
     return filters
 

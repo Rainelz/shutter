@@ -230,6 +230,8 @@ class Tablegen():
         text_heads = self.config['textheads']
 
         if mode == 'multiple':
+            if rect[3] == 0:
+                return
             aspect_ratio = rect[2]/rect[3]
             if aspect_ratio < 0.7:
 

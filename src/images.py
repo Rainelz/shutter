@@ -211,7 +211,11 @@ class Generator:
             if isinstance(noise, str):
                 p = DEFAULT_NOISE_P
             else:
-                p = noise.get('p', DEFAULT_NOISE_P)
+                noisenode = list(noise.items())[0][1]
+                noisename = list(noise.items())[0][0]
+
+                p = noisenode.get('p', DEFAULT_NOISE_P)
+                noise = noisename
             roll = next(self.dice)
             if roll <= p:
                 noises.append(noise)
@@ -334,10 +338,11 @@ class TextGroup(Generator):
         while offset + l_height < cropped[1]:
 
             for line in textwrap.wrap(next(text_gen), width=width):
-                if offset + font.getsize(line)[1] > cropped[1]:
+                l_height=font.getsize(line)[1]
+                if offset + l_height > cropped[1]:
                     break
                 draw.text(((size[0]-cropped[0])//2, offset), line, font=font, fill=0)
-                offset += font.getsize(line)[1]
+                offset += l_height
         return img
 
 
@@ -403,41 +408,6 @@ class Image(Generator):
         return img
 
 
-class Header(Generator):
-    """
-    |-----------|-------|-----------|
-    |     L     |   C   |     R     |
-    |___________|_______|___________|
-
-    """
-    def __init__(self, opt):
-        self.sizes = get_sizes(opt)
-
-        self.elements = get_components(opt, opt)
-
-    def generate(self, size):
-        super().__init__(size)
-        width, height = size
-        unit = (width // 10)
-        l = TextGroup((unit * 4, height))
-        c = Text((unit * 2, height))
-        r = ((unit*4, height))
-        self.add(l, (0,0))
-        self.add(c, (unit*4, 0))
-        self.add(r, (unit*6, 0))
-        self.render()
-        #self.save('test_header.png')
-
-
-    @staticmethod
-    def random(cfg):
-        p = cfg.get('probability', 50)
-        if random.randint(0, 100) > p :
-            pass
-        else:
-            pass
-
-
 class Table(Generator):
     def generate(self, container_size=None):
         w_border = random.randint(5, 15)  # %
@@ -452,7 +422,6 @@ class Table(Generator):
         t.compose(img, ( (size[0]-cropped[0] ) // 2 , (size[1]-cropped[1] ) //2, *cropped))
         img.render()
         return img
-
 
 
 class Footer(Generator):
