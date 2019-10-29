@@ -207,7 +207,7 @@ class Generator:
 
     def get_spoilers(self):
         noises = []
-        for noise in self.node.get('noises', list()):
+        for noise in self.node.get('spoilers', list()):
             if isinstance(noise, str):
                 p = DEFAULT_NOISE_P
             else:
