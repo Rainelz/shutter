@@ -4,7 +4,7 @@ import PIL, PIL.ImageFont, PIL.Image, PIL.ImageDraw, PIL.ImageChops, PIL.ImageOp
 import math
 from abc import ABC, abstractmethod
 from typing import List
-from images import BaseComponent, Visitor, Image
+from images import Component, Visitor, Image
 
 
 class Filter(Visitor):
@@ -13,18 +13,26 @@ class Filter(Visitor):
     def should_visit_leaves(self):
         return False
 
-    def run(self, image):
+    def run(self, image: Component):
         pass
 
-    def visit(self, component: BaseComponent):
-        component._img = component.convert('L')
+    def visit(self, component: Component):
+        for el, _ in component.elements:
+            self.visit(el)
+        component.render()
 
-        if self.should_visit_leaves():
-            for el, _ in component.elements:
-                self.visit(el)
-            component.render()
-
-        component.update(self.run(component))
+        if self.__class__.__name__ in component.spoilers:
+            component._img = component.convert('L')
+            component.update(self.run(component))
+        # if self.__class__.__name__ in component.spoilers:
+        # component._img = component.convert('L')
+        #
+        # if self.should_visit_leaves():
+        #     for el, _ in component.elements:
+        #         self.visit(el)
+        #     component.render()
+        #
+        # component.update(self.run(component))
 
 
 class Crop(Filter):
@@ -328,7 +336,7 @@ def spoil(im, options):
         VerticalLine.random(),
         Overlay.random('resources/stamps', (100, 100)),
         Rotate.random() if not options.no_skew else Filter(),
-        # Pad.random(),
+        Pad.random(),
         Background.random(),
         Foreground.random(),
         Stroke.random(),

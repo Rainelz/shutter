@@ -15,7 +15,6 @@ from abc import ABC, abstractmethod
 from tablegen import Tablegen
 
 
-
 class BaseComponent(ABC):
     """
     Abstract class defining the component interface for visitors
@@ -58,13 +57,14 @@ class Component(BaseComponent):
 
     """
 
-    def __init__(self, size, background_color=(255,255,255)):
+    def __init__(self, size, spoilers=[], background_color=(255,255,255)):
         if len(background_color) > 1:
             color_space = 'RGBA'
         else:
             color_space = 'L'
         self._img = PIL.Image.new(color_space, size, background_color)
         self.elements = []
+        self.spoilers = spoilers
 
     def __getattr__(self, item):
         """Maps unresolved function calls to pillow Image calls"""
@@ -186,8 +186,11 @@ def calc_probabilities():
         for val in chances:
             yield val
 
+
 MIN = 0
 MAX = 1
+
+DEFAULT_NOISE_P = 0.5
 class Generator:
     """
     Class containing criteria and probabilities to generate a composable image
@@ -202,6 +205,18 @@ class Generator:
         self.dice = calc_probabilities()
         self.components = []
 
+    def get_spoilers(self):
+        noises = []
+        for noise in self.node.get('noises', list()):
+            if isinstance(noise, str):
+                p = DEFAULT_NOISE_P
+            else:
+                p = noise.get('p', DEFAULT_NOISE_P)
+            roll = next(self.dice)
+            if roll <= p:
+                noises.append(noise)
+        return noises
+
     def __str__(self):
         return self.__class__.__name__
 
@@ -213,7 +228,8 @@ class Generator:
             size = [int(dim * size[i]) for i, dim in enumerate(container_size)]
         size = int(size[0]), int(size[1])
         logging.info(f"Generating image with size {size}")
-        img = Component(size)
+        spoilers = self.get_spoilers()
+        img = Component(size, spoilers)
         available_x, available_y = width, height = size
         # total_units = 100
         # unit = (height // total_units)
@@ -234,41 +250,6 @@ class Generator:
             img.add(im, (x,y))
         img.render()
         return img
-        #     available_x -= component.width
-        #     available_y -= component.height
-        #     self.components.append(component)
-        #     # self.generators[i] = (gen, component)
-        #
-        # # assert available_x >= 0
-        # # assert available_y >= 0
-        #
-        # available_x = 0
-        # available_y = 0
-        # for gen, im in self.generators:
-        #
-        #     node = gen.node
-        #     x_minmax, y_minmax = get_position_range(node)
-        #     baseline_x = int(width*x_minmax[MIN])
-        #     baseline_y = int(height*y_minmax[MIN])
-        #     max_x = int(x_minmax[MAX]*width+1)
-        #     max_y = int(y_minmax[MAX]*height+1)
-        #     try:
-        #         x = np.random.randint(baseline_x, min(baseline_x+available_x, max_x)+1)
-        #         y = np.random.randint(baseline_y, min(baseline_y+available_y, max_y)+1)
-        #     except ValueError as e:
-        #         print("Illegal configuration (position")
-        #         continue
-        #
-        #     if x+im.width > size[0] or y + im.height > size[1]:
-        #         logging.warning("Placing Component outside image range")
-        #
-        #     # available_x -= x - baseline_x
-        #     # available_y -= y - baseline_y
-        #
-        #     img.add(im, (x,y))
-        #
-        # img.render()
-        # return img
 
 
 class Container(Generator):
@@ -326,8 +307,8 @@ class TextGroup(Generator):
 
         factors = next(self.sizes)
         size = [int(dim*factors[i]) for i, dim in enumerate(container_size)]
-
-        img = Component(size)
+        spoilers = self.get_spoilers()
+        img = Component(size, spoilers)
         height = random.choice(TextGroup.font_sizes)
         font_name = random.choice(fonts)
         font = PIL.ImageFont.truetype(font_name, height)
@@ -376,7 +357,6 @@ class Text(Component):
         draw.text(((size[0]-cropped[0])/2, (size[1]-cropped[1])//2),txt, font=font, fill=0, align=random.choice(Text.alignments))
 
 
-
 class Image(Generator):
 #    STAMPS = list(Path('resources/heading_stamps/').glob('*.png'))
 
@@ -400,8 +380,8 @@ class Image(Generator):
 
         factors = next(self.sizes)
         size = [int(dim * factors[i]) for i, dim in enumerate(container_size)]
-
-        img = Component(size)
+        spoilers = self.get_spoilers()
+        img = Component(size, spoilers)
         w_border = random.randint(5,15) #  %
         h_border = random.randint(5,15)
 
@@ -457,12 +437,14 @@ class Header(Generator):
         else:
             pass
 
+
 class Table(Generator):
-    def generate(self, container_size):
+    def generate(self, container_size=None):
         w_border = random.randint(5, 15)  # %
         h_border = random.randint(5, 15)
         factors = next(self.sizes)
         size = [int(dim * factors[i]) for i, dim in enumerate(container_size)]
+        spoilers = self.get_spoilers()
         img = Component(size)
         cropped = (size[0] - int(size[0] * w_border / 100)), (size[1] - int(size[1] * h_border / 100))
 
@@ -471,30 +453,15 @@ class Table(Generator):
         img.render()
         return img
 
-class Body(Component):
-
-    def __init__(self, size):
-        super().__init__(size)
-        width, height = size
-        unit = (width // 5)
-        l = TextGroup((size[0], size[1]//2))
-        #t = Table
-        # c = Text((unit, height))
-        # r = HeadingStamp((unit*2, height))
-        self.add(l, (0, 0))
-        self.render()
-        #self.paste(r, (unit*3, 0))
-        #self.save('test_body.png')
-
 
 
 class Footer(Generator):
 
-    def generate(self, container_size):
+    def generate(self, container_size=None):
         factors = next(self.sizes)
         size = [int(dim * factors[i]) for i, dim in enumerate(container_size)]
-
-        img = Component(size)
+        spoilers = self.get_spoilers()
+        img = Component(size, spoilers)
         w_border = random.randint(5, 15)  # %
         h_border = random.randint(5, 15)
 
@@ -518,10 +485,7 @@ class Footer(Generator):
         img.add(r, r_pos)
         img.render()
         return img
-    # def render(self):
-    #     for el, pos in self.elements:
-    #         self.paste(el.copy(), pos)
-    #     self.save('test_footer.png')
+
 
 
 
@@ -535,55 +499,4 @@ fn_map = {'uniform': random.uniform,
         #visitor.visit(self)
 SAMPLES = 1000
 
-
-
-
-
-
-
-    # def generate(self, container_size=None):
-    #
-    #     size = next(self.sizes)
-    #     size = int(size[0]), int(size[1])
-    #     img = Component(size)
-    #     available_x, available_y = width, height = size
-    #     # total_units = 100
-    #     # unit = (height // total_units)
-    #
-    #     for i, gen in enumerate(self.generators):
-    #         component = gen.generate(size)
-    #         available_x -= component.width
-    #         available_y -= component.height
-    #         self.generators[i] = (gen, component)
-    #
-    #     assert available_x >= 0
-    #     assert available_y >= 0
-    #
-    #     available_x += 1
-    #     available_y += 1
-    #     for gen, im in self.generators:
-    #
-    #         node = gen.node
-    #         x_minmax, y_minmax = get_position_range(node)
-    #         baseline_x = int(width*x_minmax[MIN])
-    #         baseline_y = int(height*y_minmax[MIN])
-    #         max_x = int(x_minmax[MAX]*width+1)
-    #         max_y = int(y_minmax[MAX]*height+1)
-    #         try:
-    #             x = np.random.randint(baseline_x, min(baseline_x+available_x, max_x))
-    #             y = np.random.randint(baseline_y, min(baseline_y+available_y, max_y))
-    #         except ValueError as e:
-    #             print("Illegal configuration (position")
-    #             continue
-    #
-    #         if x+im.width > size[0] or y + im.height > size[1]:
-    #             logging.warning("Placing Component outside image range")
-    #
-    #         available_x -= x - baseline_x
-    #         available_y -= y - baseline_y
-    #
-    #         img.add(im, (x,y))
-    #
-    #     img.render()
-    #     return img
 
