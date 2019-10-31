@@ -4,14 +4,13 @@ import PIL.Image
 from PIL import ImageDraw
 import numpy as np
 import numpy.random as random
-from scipy.stats import truncnorm
 import inspect
 import logging
 from pathlib import Path
 import textwrap
 from abc import ABC, abstractmethod
 
-
+from dice_roller import roll, fn_map, SAMPLES
 from tablegen import Tablegen
 
 
@@ -20,6 +19,7 @@ class BaseComponent(ABC):
     Abstract class defining the component interface for visitors
     """
     elements = NotImplemented
+    node = NotImplemented
 
     @abstractmethod
     def update(self, val):
@@ -36,18 +36,14 @@ class Visitor(ABC):
     def visit(self, component: BaseComponent):
         pass
 
-    @abstractmethod
-    def should_visit_leaves(self):
-        pass
-
 
 class Exporter(Visitor):
     def visit(self, component: BaseComponent, *kwargs):
         if len(component.elements) == 0:
             return
-
-    def should_visit_leaves(self):
-        return False
+    #
+    # def should_visit_leaves(self):
+    #     return False
 
 
 class Component(BaseComponent):
@@ -57,14 +53,14 @@ class Component(BaseComponent):
 
     """
 
-    def __init__(self, size, spoilers=[], background_color=(255,255,255)):
+    def __init__(self, size, node, background_color=(255,255,255)):
         if len(background_color) > 1:
             color_space = 'RGBA'
         else:
             color_space = 'L'
         self._img = PIL.Image.new(color_space, size, background_color)
         self.elements = []
-        self.spoilers = spoilers
+        self.node = node
 
     def __getattr__(self, item):
         """Maps unresolved function calls to pillow Image calls"""
@@ -88,7 +84,6 @@ class Component(BaseComponent):
     def render(self):
         """Render sub-elements pasting each component at given position"""
         for el, pos in self.elements:
-            #el.render()
             self.paste(el.copy(), pos)
 
     def add(self, *items):
@@ -140,7 +135,7 @@ def get_position_range(parent_size, node):
 
     return x, y
 
-
+# TODO move this
 def get_sizes(node):
     size = node.get('size', dict())
 
@@ -179,12 +174,6 @@ def get_sizes(node):
             yield couple
 
 
-def calc_probabilities():
-    """Generate samples in range [0,1]"""
-    while True:
-        chances = random.uniform(0,1, SAMPLES)
-        for val in chances:
-            yield val
 
 
 MIN = 0
@@ -202,8 +191,10 @@ class Generator:
         self.generators = get_components(node)
         #assert all(gen.p == 1 for gen in self.generators) or sum(gen.p for gen in self.generators) == 1
         self.p = node.get('probability',1)
-        self.dice = calc_probabilities()
         self.components = []
+
+    def __str__(self):
+        return self.__class__.__name__
 
     def get_spoilers(self):
         noises = []
@@ -216,13 +207,9 @@ class Generator:
 
                 p = noisenode.get('p', DEFAULT_NOISE_P)
                 noise = noisename
-            roll = next(self.dice)
-            if roll <= p:
+            if roll() <= p:
                 noises.append(noise)
         return noises
-
-    def __str__(self):
-        return self.__class__.__name__
 
     def generate(self, container_size=None):
         """Runs sub-elements generation and computes positions based on the config parameters"""
@@ -231,15 +218,15 @@ class Generator:
         if container_size is not None:
             size = [int(dim * size[i]) for i, dim in enumerate(container_size)]
         size = int(size[0]), int(size[1])
-        logging.info(f"Generating image with size {size}")
-        spoilers = self.get_spoilers()
-        img = Component(size, spoilers)
+        #logging.info(f"Generating image with size {size}")
+#        spoilers = self.get_spoilers()
+        img = Component(size, self.node)
         available_x, available_y = width, height = size
         # total_units = 100
         # unit = (height // total_units)
 
         for gen in self.generators:
-            if next(self.dice) > gen.p:
+            if roll() > gen.p:
                 continue
             im = gen.generate(size)
             node = gen.node
@@ -265,7 +252,7 @@ class Container(Generator):
             size = [int(dim * size[i]) for i, dim in enumerate(container_size)]
         size = int(size[0]), int(size[1])
         logging.info(f"Generating image with size {size}")
-        img = Component(size)
+        img = Component(size, self.node)
         available_x, available_y = width, height = size
         # total_units = 100
         # unit = (height // total_units)
@@ -290,7 +277,7 @@ class TextGroup(Generator):
         import os
         if self.data_path:
             file_size = os.path.getsize(self.data_path)
-            offset = random.randint(0, file_size)
+            offset = random.randint(1, file_size)
             with open(self.data_path, 'r') as file:
                 file.seek(offset)
                 file.readline()
@@ -312,7 +299,7 @@ class TextGroup(Generator):
         factors = next(self.sizes)
         size = [int(dim*factors[i]) for i, dim in enumerate(container_size)]
         spoilers = self.get_spoilers()
-        img = Component(size, spoilers)
+        img = Component(size, self.node)
         height = random.choice(TextGroup.font_sizes)
         font_name = random.choice(fonts)
         font = PIL.ImageFont.truetype(font_name, height)
@@ -350,7 +337,7 @@ class Text(Component):
     alignments = ['left', 'center', 'right']
 
     def __init__(self, size, font=PIL.ImageFont.truetype('Arial', 16), txt='Testo Prova   ', cfg=None):
-        super().__init__(size)
+        super().__init__(size, dict())
 
         w_border = random.randint(5,15) #  %
         h_border = random.randint(5,15)
@@ -369,14 +356,18 @@ class Image(Generator):
         files_node = self.node.get('files', None)
         if files_node:
             f_path = Path(files_node['path'])
+
             if not f_path.exists():
                 raise ValueError(f"Path {f_path} does not exist")
 
-            probabilities = files_node['probabilities']
-            map = [(name, value) for entry in probabilities for name, value in entry.items()]
-            files, probs = list(zip(*map))
             paths = list(f_path.glob('*.png'))
-            paths = sorted(paths, key=lambda x: list(files).index(str(x.stem))) # order Paths like zip result to keep coupling with probs
+            probabilities = files_node.get('probabilities', None)
+            if probabilities:
+                map = [(name, value) for name, value in probabilities.items()]
+                files, probs = list(zip(*map))
+                paths = sorted(paths, key=lambda x: list(files).index(str(x.stem))) # order Paths like zip result to keep coupling with probs
+            else:
+                probs = None
             file_path = random.choice(paths, p=probs)
         else:
             file_path = self.node['file']
@@ -386,8 +377,8 @@ class Image(Generator):
         factors = next(self.sizes)
         size = [int(dim * factors[i]) for i, dim in enumerate(container_size)]
         spoilers = self.get_spoilers()
-        img = Component(size, spoilers)
-        w_border = random.randint(5,15) #  %
+        img = Component(size, self.node)
+        w_border = random.randint(5,15) #
         h_border = random.randint(5,15)
 
         cropped = (size[0] - int(size[0] * w_border/100)), (size[1] - int(size[1]*h_border/100))
@@ -415,7 +406,7 @@ class Table(Generator):
         factors = next(self.sizes)
         size = [int(dim * factors[i]) for i, dim in enumerate(container_size)]
         spoilers = self.get_spoilers()
-        img = Component(size)
+        img = Component(size, self.node)
         cropped = (size[0] - int(size[0] * w_border / 100)), (size[1] - int(size[1] * h_border / 100))
 
         t = Tablegen(*cropped)
@@ -430,7 +421,7 @@ class Footer(Generator):
         factors = next(self.sizes)
         size = [int(dim * factors[i]) for i, dim in enumerate(container_size)]
         spoilers = self.get_spoilers()
-        img = Component(size, spoilers)
+        img = Component(size, self.node)
         w_border = random.randint(5, 15)  # %
         h_border = random.randint(5, 15)
 
@@ -458,14 +449,6 @@ class Footer(Generator):
 
 
 
-def truncated_normal(mean=0, sd=1, low=0, upp=10, samples=1):
-    a, b = (low - mean) / sd, (upp - mean) / sd
-    return truncnorm(a, b, loc=mean, scale=sd).rvs(samples)
 
-
-fn_map = {'uniform': random.uniform,
-          'normal': truncated_normal}
-        #visitor.visit(self)
-SAMPLES = 1000
 
 

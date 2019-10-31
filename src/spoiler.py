@@ -1,45 +1,64 @@
 from __future__ import annotations
 import numpy.random as random
 import PIL, PIL.ImageFont, PIL.Image, PIL.ImageDraw, PIL.ImageChops, PIL.ImageOps, PIL.ImageFilter
+from pathlib import Path
 import math
-from abc import ABC, abstractmethod
-from typing import List
-from images import Component, Visitor, Image
+import inspect
+import logging
+from dice_roller import roll, roll_value
+
+from images import Component, Visitor
 
 
-class Filter(Visitor):
-    """Implements basic filter behaviour"""
-
-    def should_visit_leaves(self):
-        return False
-
-    def run(self, image: Component):
-        pass
+class Spoiler(Visitor):
+    def __init__(self):
+        import sys
+        local_classes = inspect.getmembers(sys.modules[__name__], inspect.isclass)
+        local_classes = {name: cls for name, cls in local_classes
+                         if name not in ['Spoiler', 'Component']  and not inspect.isabstract(cls)}
+        self.filter_classes = local_classes
 
     def visit(self, component: Component):
         for el, _ in component.elements:
             self.visit(el)
-        component.render()
+            component.render()
+        for spoiler_name, kwargs in component.node.get('spoilers', dict()).items():
 
-        if self.__class__.__name__ in component.spoilers:
+            kwargs = kwargs or dict() # handle no args, default values
+
+            cls = self.filter_classes[spoiler_name]
+            spoiler = cls(**kwargs)
+
             component._img = component.convert('L')
-            component.update(self.run(component))
 
-        # if self.__class__.__name__ in component.spoilers:
-        # component._img = component.convert('L')
-        #
-        # if self.should_visit_leaves():
-        #     for el, _ in component.elements:
-        #         self.visit(el)
-        #     component.render()
-        #
-        # component.update(self.run(component))
+            component.update(spoiler.roll_and_run(component)) # do nothing if not run
+
+
+class Filter:
+    """Implements basic filter behaviour"""
+
+    def __init__(self, p=1, **_):
+        assert 0 <= p <= 1
+        self.p = p
+
+    def roll_and_run(self, image: Component):
+        """Rolls and eventually applies the filter"""
+        if roll() <= self.p:
+            return self.run(image)
+
+    def run(self, image: Component):
+        pass
+
+
 
 
 class Crop(Filter):
-    def __init__(self, border=0):
+    DEFAULT_BORDER = 0
+
+    def __init__(self, border=DEFAULT_BORDER, **kwargs):
+        super().__init__(**kwargs)
+
         self.border = border
-        pass
 
     def run(self, image):
         w, h = image.size
@@ -54,34 +73,29 @@ class Crop(Filter):
         box[3] += (10 + self.border * 3)
         return image.crop(tuple(box))
 
-    @staticmethod
-    def from_cfg(cfg):
-        return Crop(random.randint(0, 50))
-        #return Crop()
-
 
 class Pad(Filter):
-    def __init__(self, n):
+    DEFAULT_N = 2
+
+    def __init__(self, n=DEFAULT_N, **kwargs):
+        super().__init__(**kwargs)
         self.n = n
 
     def run(self, image):
+        logging.debug(f"Running Pad with n:{self.n}")
         w, h = image.size
         bg = PIL.Image.new(image.mode, (w + 2 * self.n, h + 2 * self.n), 0)
         bg.paste(image, (self.n, self.n))
         return bg
 
-    @staticmethod
-    def random():
-        return Pad(random.randint(2, 5))
-
-    def should_visit_leaves(self):
-        return True
-
 
 class Rotate(Filter):
-    def __init__(self, angle):
-        self.angle = angle
-        alpha = math.pi * angle / 180
+    DEFAULT_ANGLE = 0
+
+    def __init__(self, angle=DEFAULT_ANGLE, **kwargs):
+        super().__init__(**kwargs)
+        self.angle = round(roll_value(angle), 1)
+        alpha = math.pi * self.angle / 180
         self.c = abs(math.cos(alpha))
         self.s = abs(math.sin(alpha))
 
@@ -93,23 +107,13 @@ class Rotate(Filter):
         return ((W - w1) // 2, (H - h1) // 2, (W - w1) // 2 + w1, (H - h1) // 2 + h1)
 
     def run(self, image):
-        if isinstance(image, Image):
-            #rotated = Pad(100).run(image).convert('RGBA').rotate(self.angle, expand = 1)
-            rotated = image.convert('RGBA').rotate(self.angle, expand=1, fillcolor='white')
-            box = self.center_box(rotated.size, image.size)
-            return rotated.crop(box)
-        else:
-            return image
+        logging.debug(f"Running Rotate with angle {self.angle}")
+        #TODO check this
+        #rotated = Pad(100).run(image).convert('RGBA').rotate(self.angle, expand = 1)
+        rotated = image.convert('RGBA').rotate(self.angle, resample=PIL.Image.BICUBIC, expand=True, fillcolor='white',)
+        box = self.center_box(rotated.size, image.size)
+        return rotated.crop(box)
 
-    def should_visit_leaves(self):
-        return True
-
-    @staticmethod
-    def random():
-        # if random.randint(0, 10) < 7:
-        #     return Filter()
-        # else:
-        return Rotate(random.randint(-10, 10   ))
 
 
 def _white_noise(width, height, m=0, M=255):
@@ -120,7 +124,10 @@ def _white_noise(width, height, m=0, M=255):
 
 
 class Background(Filter):
-    def __init__(self, grey):
+    DEFAULT_GREY=220
+
+    def __init__(self, grey=DEFAULT_GREY, **kwargs):
+        super().__init__(**kwargs)
         self.grey = grey
 
     def run(self, image):
@@ -128,19 +135,14 @@ class Background(Filter):
         noise = _white_noise(w, h, self.grey, 255)
         return PIL.ImageChops.darker(image, noise)
 
-    def should_visit_leaves(self):
-        return True
 
-    @staticmethod
-    def random():
-        # if random.randint(0, 10) < 7:
-        #     return Filter()
-        # else:
-        return Background(random.randint(220, 245))
 
 
 class Foreground(Filter):
-    def __init__(self, grey):
+    DEFAULT_GREY=200
+
+    def __init__(self, grey=DEFAULT_GREY, **kwargs):
+        super().__init__(**kwargs)
         self.grey = grey
 
     def run(self, image):
@@ -148,39 +150,26 @@ class Foreground(Filter):
         noise = _white_noise(w, h, 0, self.grey)
         return PIL.ImageChops.lighter(image, noise)
 
-    def should_visit_leaves(self):
-        return True
-
-    @staticmethod
-    def random():
-        # if random.randint(0, 10) < 6:
-        #     return Filter()
-        # else:
-        return Foreground(random.randint(150, 255))
 
 
 class Blur(Filter):
-    def __init__(self, r):
-        self.r = r
+    DEFAULT_R = 2
+
+    def __init__(self, r=DEFAULT_R, **kwargs):
+        super().__init__(**kwargs)
+        self.r = roll_value(r)
 
     def run(self, image):
+        logging.debug(f"Running Blur with radius {self.r}")
         return image.filter(PIL.ImageFilter.GaussianBlur(self.r))
 
-    @staticmethod
-    def random():
-        # if random.randint(0, 10) < 8:
-        #     return Filter()
-        # else:
-        return Blur(1)
-
-    def should_visit_leaves(self):
-        return True
 
 class Stroke(Filter):
-    def __init__(self, num_signs, num_strokes, step):
-        self.num_signs = num_signs
-        self.num_strokes = num_strokes
-        self.step = step
+    def __init__(self, num_signs=None, num_strokes=None, step=None, **kwargs):
+        super().__init__(*kwargs)
+        self.num_signs = num_signs or random.randint(1, 6)
+        self.num_strokes = num_strokes or random.randint(3, 14)
+        self.step = step or random.randint(10, 50)
 
     def move(self, position, size):
         x, y = position
@@ -202,47 +191,47 @@ class Stroke(Filter):
             self.draw_sign(image._img)
         return image
 
-    def should_visit_leaves(self):
-        return True
-
-    @staticmethod
-    def random():
-        # if random.randint(0, 10) < 7:
-        #     return Filter()
-        # else:
-        return Stroke(random.randint(1, 6), random.randint(3, 14), random.randint(10, 50))
-
 
 class Overlay(Filter):
-    def __init__(self, overlay, size):
-        self.overlay = overlay.convert('L').resize(size)
-        self.w, self.h = size
+    def __init__(self, path, size, probabilities=[], **kwargs):
+        super().__init__(**kwargs)
+        self.path = Path(path)
+        assert self.path.exists()
+        self.probabilities = probabilities
+        self.w, self.h = size['height'], size['width']
 
-    def pad_overlay_at(self, size):
+    @staticmethod
+    def pad_overlay_at(overlay, size):
         w, h = size
         bg = PIL.Image.new("L", size, 255)
-        w1 = random.randint(0, w - self.w)
-        h1 = random.randint(0, h - self.h)
-        bg.paste(self.overlay, (w1, h1))
+        w1 = random.randint(0, w - overlay.width)
+        h1 = random.randint(0, h - overlay.height)
+        bg.paste(overlay, (w1, h1))
         return bg
 
     def run(self, image):
-        overlay = self.pad_overlay_at(image.size)
+        if self.path.is_dir():
+            paths = list(self.path.glob('*.png'))
+
+            if self.probabilities:
+                map = [(name, value) for name, value in self.probabilities.items()]
+                files, probs = list(zip(*map))
+                paths = sorted(paths, key=lambda x: list(files).index(
+                    str(x.stem)))  # order Paths like zip result to keep coupling with probs
+            else:
+                probs = None
+            file_path = random.choice(paths, p=probs)
+        else:
+            file_path = self.path
+
+        overlay = PIL.Image.open(file_path).convert('L').resize((self.w, self.h))
+
+        overlay = Overlay.pad_overlay_at(overlay, image.size)
         return PIL.ImageChops.darker(image, overlay)
 
     @staticmethod
     def open(path, size):
         return Overlay(PIL.Image.open(path), size)
-
-    @staticmethod
-    def random(dir, size):
-        import os
-        # if random.randint(0, 10) < 7:
-        #     return Filter()
-        # else:
-        file = random.choice(os.listdir(dir))
-        full_path = os.path.join(dir, file)
-        return Overlay.open(full_path, size)
 
 
 class VerticalLine(Filter):
@@ -259,17 +248,9 @@ class VerticalLine(Filter):
             return image
         return image
 
-    @staticmethod
-    def random():
-        import os
-        # if random.randint(0, 10) < 9:
-        #     return Filter()
-        # else:
-        return VerticalLine()
-
-
 class Gradient(Filter):
-    def __init__(self, gradient_magnitude=1., direction=0, color=0):
+    def __init__(self, gradient_magnitude=1., direction=0, color=0, **kwargs):
+        super().__init__(**kwargs)
         self.gradient_mg = gradient_magnitude
         self.direction = direction
         self.color = color
@@ -305,16 +286,16 @@ class Gradient(Filter):
         black_im.putalpha(alpha)
         gradient_im = PIL.Image.alpha_composite(image, black_im)
         return gradient_im
-
-    @staticmethod
-    def random():
-        # if random.randint(0, 10) < 7:
-        #     return Filter()
-        # else:
-        grad = random.randint(1, 10)
-        dir = random.randint(0, 1)
-        color = random.randint(100, 200)
-        return Gradient(grad/10, dir, color)
+    #
+    # @staticmethod
+    # def random():
+    #     # if random.randint(0, 10) < 7:
+    #     #     return Filter()
+    #     # else:
+    #     grad = random.randint(1, 10)
+    #     dir = random.randint(0, 1)
+    #     color = random.randint(100, 200)
+    #     return Gradient(grad/10, dir, color)
 
 def filters_from_cfg(cfg):
     filters = [
