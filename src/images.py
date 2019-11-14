@@ -10,7 +10,7 @@ from pathlib import Path
 import textwrap
 from abc import ABC, abstractmethod
 
-from dice_roller import roll, fn_map, SAMPLES
+from dice_roller import roll, roll_value, fn_map, SAMPLES
 from tablegen import Tablegen
 from math import ceil
 
@@ -54,7 +54,7 @@ class Component(BaseComponent):
 
     """
 
-    def __init__(self, size, node, background_color=(255,255,255)):
+    def __init__(self, size, node, background_color=(255,255,255,255)):
         if len(background_color) > 1:
             color_space = 'RGB'
         else:
@@ -270,6 +270,7 @@ class TextGroup(Generator):
     def __init__(self, opt):
         super().__init__(opt)
         self.data_path = self.node.get('source_path', None)
+        self.n_lines = self.node.get('n_lines', -1)
 
     def text_gen(self):
         import os
@@ -292,16 +293,17 @@ class TextGroup(Generator):
                 for line in text.split('\n'):
                     yield line
 
-    def generate(self, container_size=None, dataloader=None, fonts=('Arial',) ):
+    def generate(self, container_size=None, dataloader=None, fonts=('Courier',) ):
 
         factors = next(self.sizes)
         size = [int(dim*factors[i]) for i, dim in enumerate(container_size)]
-        spoilers = self.get_spoilers()
+        #spoilers = self.get_spoilers()
         img = Component(size, self.node)
         height = random.choice(TextGroup.font_sizes)
         font_name = random.choice(fonts)
         font = PIL.ImageFont.truetype(font_name, height)
-        ascent, descent = font.getmetrics()
+        #n_lines = roll_value(self.node)
+        #ascent, descent = font.getmetrics()
 
         # line_height = ascent + descent
         # n_lines = size[1] // line_height

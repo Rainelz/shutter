@@ -1,7 +1,7 @@
 import numpy.random as random
 import argparse
 import os, logging, sys
-
+from multiprocessing import Process
 import yaml
 
 from images import Generator
@@ -11,6 +11,7 @@ from spoiler import Spoiler
 
 def config_logger():
     logger = logging.getLogger()
+    logging.getLogger('PIL').setLevel(logging.ERROR)
     logger.setLevel(logging.DEBUG)
     formatter = logging.Formatter('%(asctime)s %(levelname)s - [%(threadName)s] %(message)s')
     stdout_handler = logging.StreamHandler(sys.stdout)
@@ -21,12 +22,12 @@ def config_logger():
 def parse_options():
     parser = argparse.ArgumentParser(description='Generated text and images.')
     parser.add_argument('--config', required=True, help='path to YAML config file')
+    parser.add_argument('--workers', required=False, help='Number of workers', default=1)
+
     parser.add_argument('--fonts', required=False, help='path of the list of fonts')
-    #parser.add_argument('--text', required=True, help='path of the text file')
     parser.add_argument('--dir', required=True, help='path of the output directory')
     parser.add_argument('--size', type=int, default=100, help='how many examples to generate')
     parser.add_argument('--no-filters', type=bool, default=False, help='Don\'t apply filters')
-    #parser.add_argument('--gen-truth', default=False, help='Generate ground truth images', action="store_true")
     parser.add_argument('--no-skew', default=False, help='Don\'t skew images',  action="store_true")
     parser.add_argument('--dpi', type=int, default=70, help='Noisy images dpi')
 
@@ -34,7 +35,28 @@ def parse_options():
     return parser.parse_args()
 
 
+def gen_image(image_generator, visitors, options, i):
+    logging.info(f"{i + 1}/{options.size}")
+
+    img_file = '%s/%04d.png' % (options.dir, i)
+    truth_file = '%s/GT/%04d_GT.png' % (options.dir, i)
+
+    image = image_generator.generate()
+    image.save(truth_file, dpi=(300, 300))
+
+    logging.info("Generated Image. Applying spoilers")
+    for visitor in visitors:
+        image.accept(visitor)
+
+    image.save(img_file, dpi=(options.dpi, options.dpi))
+
+def gen_image_pool(generator, visitors, pool_list, opt, seed):
+    random.seed(seed)
+    for item in pool_list:
+        gen_image(generator, visitors, opt, item)
+
 def main():
+    import numpy as np
     options = parse_options()
     config_logger()
     with open(options.config, 'r') as stream:
@@ -44,56 +66,31 @@ def main():
             logging.exception(exc)
             exit(1)
 
-    #fonts = load_fonts(options.fonts, size=15)
-    fonts=[]
-    #with open(options.text) as f:
-        #lines = f.readlines()
-
-    #if options.gen_truth:
     os.makedirs(f"{options.dir}/GT", exist_ok=True)
     seed = opt.get('seed', None)
     if not seed:
         seed = random.randint(0, 2**32-1)
         opt['seed'] = seed
     logging.info(f"Starting generation with seed {seed} ")
+    n_workers= options.workers
+    filler = [None for _ in range(n_workers - (options.size % n_workers))]
+    vals = np.concatenate([np.arange(options.size), filler]).reshape(-1, n_workers).transpose()
+    vals = [[val for val in values if val is not None] for values in vals]
+    processes = []
 
     random.seed(seed)
-    image_generator = Generator(opt)
-    #filters = filters_from_cfg(None)
-    spoiler = Spoiler()
-    for i in range(options.size):
-        logging.info(f"{i+1}/{options.size}")
-        #im =
-       # text, noisy, im = random_image(lines, fonts, options)
-        text_file = '%s/%04d.txt' % (options.dir, i)
-        img_file = '%s/%04d.png' % (options.dir, i)
-        truth_file = '%s/GT/%04d_GT.png' % (options.dir, i)
 
-        image = image_generator.generate()
-        #if options.gen_truth:
-        image.save(truth_file, dpi=(300,300))
-
-        logging.info("Generated Image. Applying spoilers")
-        image.accept(spoiler)
-        # for filter in filters:
-        #     image.accept(filter)
-        # el.accept(Background(random.randint(220, 245)))
-        # el.accept(Foreground(random.randint(200,255)))
-        # image.render()
-        image.save(img_file, dpi=(options.dpi, options.dpi) )
-
+    for i in range(n_workers):
+        seed = random.randint(0,2**32-1)
+        visitors = [Spoiler()]
+        p = Process(target=gen_image_pool, args=(Generator(opt), visitors, vals[i], options, seed))
+        p.start()
+        processes.append(p)
+    for p in processes:
+        p.join()
 
     with open(f"{options.dir}/config.yml", 'w') as f:
         yaml.dump(opt, f)
-
-        # if not options.gen_truth:
-        #     text_visitor = None
-        #     text = image.accept(text_visitor)
-        #     with open(text_file, 'w') as f:
-        #         f.write(text)
-
-
-        #im.save(img_file)
 
 
 if __name__ == '__main__':
