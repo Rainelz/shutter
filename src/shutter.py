@@ -4,9 +4,10 @@ import os, logging, sys
 
 import yaml
 
-
 from images import Generator
 from spoiler import Spoiler
+
+
 
 def config_logger():
     logger = logging.getLogger()

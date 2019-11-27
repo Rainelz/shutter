@@ -12,6 +12,7 @@ from abc import ABC, abstractmethod
 
 from dice_roller import roll, fn_map, SAMPLES
 from tablegen import Tablegen
+from math import ceil
 
 
 class BaseComponent(ABC):
@@ -55,7 +56,7 @@ class Component(BaseComponent):
 
     def __init__(self, size, node, background_color=(255,255,255)):
         if len(background_color) > 1:
-            color_space = 'RGBA'
+            color_space = 'RGB'
         else:
             color_space = 'L'
         self._img = PIL.Image.new(color_space, size, background_color)
@@ -104,7 +105,6 @@ def get_components(node):
         if class_name in local_classes.keys():
             cls = local_classes[class_name]
             objects.append(cls(el))
-
         else:
             raise AttributeError("error instantiating element", el)
 
@@ -123,10 +123,10 @@ def get_position_range(parent_size, node):
     if not isinstance(y, list):
         y = [y, y]
 
-    baseline_x = int(width * x[MIN])
-    baseline_y = int(height * y[MIN])
-    max_x = int(x[MAX] * width)
-    max_y = int(y[MAX] * height)
+    baseline_x = ceil(width * x[MIN])
+    baseline_y = ceil(height * y[MIN])
+    max_x = ceil(x[MAX] * width)
+    max_y = ceil(y[MAX] * height)
     try:
         x = random.randint(baseline_x, min(baseline_x, max_x) + 1)
         y = random.randint(baseline_y, min(baseline_y, max_y) + 1)
@@ -172,8 +172,6 @@ def get_sizes(node):
             hs = np.full(SAMPLES, fill_value=height)
         for couple in zip(ws, hs):
             yield couple
-
-
 
 
 MIN = 0
@@ -226,12 +224,12 @@ class Generator:
         # unit = (height // total_units)
 
         for gen in self.generators:
+
             if roll() > gen.p:
                 continue
             im = gen.generate(size)
             node = gen.node
             x, y = get_position_range(size, node)
-
             if x+im.width > size[0] or y + im.height > size[1]:
                 logging.warning("Placing Component outside image range")
 
@@ -318,7 +316,7 @@ class TextGroup(Generator):
 
         draw = ImageDraw.Draw(img)
         offset = h_border
-        width, l_height = font.getsize('A a')
+        width, l_height = font.getsize('Ag')
         width = int(cropped[0]//width*3.5)
 
         text_gen = self.text_gen()
@@ -378,19 +376,17 @@ class Image(Generator):
         size = [int(dim * factors[i]) for i, dim in enumerate(container_size)]
         spoilers = self.get_spoilers()
         img = Component(size, self.node)
-        w_border = random.randint(5,15) #
-        h_border = random.randint(5,15)
+        w_border = random.randint(1,5) #
+        h_border = random.randint(1,5)
 
         cropped = (size[0] - int(size[0] * w_border/100)), (size[1] - int(size[1]*h_border/100))
         im_size = original.size
 
         ratio = min(cropped[0]/float(im_size[0]), cropped[1]/float(im_size[1]))
-
         new_size = int(im_size[0]*ratio), int(im_size[1]*ratio)
 
         resized = original.resize(new_size, PIL.Image.ANTIALIAS)
         #self.stamp.show()
-
         rand_left = random.randint(0, w_border + cropped[0]-resized.size[0])
         rand_top = random.randint(0, h_border + cropped[1]-resized.size[1])
         position = rand_left, rand_top
@@ -398,22 +394,31 @@ class Image(Generator):
         img.paste(resized, position)
         return img
 
+#########--------------------
 
+# -- To be fixed
 class Table(Generator):
     def generate(self, container_size=None):
         w_border = random.randint(5, 15)  # %
         h_border = random.randint(5, 15)
+        w_border = 0
+        h_border = 0
         factors = next(self.sizes)
-        size = [int(dim * factors[i]) for i, dim in enumerate(container_size)]
-        spoilers = self.get_spoilers()
-        img = Component(size, self.node)
+        size = [ceil(dim * factors[i]) for i, dim in enumerate(container_size)]
+        compose_type = self.node.get('compose_type')
+        img = Component(size, self.node, background_color=(255,))
         cropped = (size[0] - int(size[0] * w_border / 100)), (size[1] - int(size[1] * h_border / 100))
-
-        t = Tablegen(*cropped)
-        t.compose(img, ( (size[0]-cropped[0] ) // 2 , (size[1]-cropped[1] ) //2, *cropped))
+        ## PASSARE A TABLE GEN IL TYPE DELLA TABELLA? IN BASE A QUELLO DECIDERE e passare il sottonodo
+        t = Tablegen(size[0],size[1],compose_type,self.node)
+        #t.compose(img, ( (size[0]-cropped[0] ) // 2 , (size[1]-cropped[1] ) //2, *cropped))
+        t.compose(img, (0,0,*size))
         img.render()
         return img
 
+# -- To be completed
+class Tablecells(Generator):
+    def generate(self, container_size=None):
+        return None
 
 class Footer(Generator):
 
@@ -424,7 +429,6 @@ class Footer(Generator):
         img = Component(size, self.node)
         w_border = random.randint(5, 15)  # %
         h_border = random.randint(5, 15)
-
 
         width, height = size
         total_units = 10

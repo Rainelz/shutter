@@ -6,8 +6,10 @@ import math
 import inspect
 import logging
 from dice_roller import roll, roll_value
-
-from images import Component, Visitor
+from images import Visitor
+from images import Component
+import cv2
+import numpy
 
 
 class Spoiler(Visitor):
@@ -150,8 +152,6 @@ class Foreground(Filter):
         noise = _white_noise(w, h, 0, self.grey)
         return PIL.ImageChops.lighter(image, noise)
 
-
-
 class Blur(Filter):
     DEFAULT_R = 2
 
@@ -190,6 +190,38 @@ class Stroke(Filter):
         for _ in range(self.num_signs):
             self.draw_sign(image._img)
         return image
+
+class Dilate(Filter):
+    def __init__(self,**kwargs):
+        super().__init__(**kwargs)
+        #self.morphs = [cv2.MORPH_RECT,cv2.MORPH_CROSS,cv2.MORPH_ELLIPSE]
+    
+    def get_kernel(self):
+        #morph = random.choice(self.morphs)
+        ksize = random.choice([1,3])
+        #return cv2.getStructuringElement(morph, (ksize, ksize))
+        return ksize
+
+    def run(self,image):
+        kernel = self.get_kernel()
+        #image = cv2.erode(np.array(image),kernel,iterations=2)
+        return image.filter(PIL.ImageFilter.MinFilter(kernel))
+
+class Erode(Filter):
+    def __init__(self,**kwargs):
+        super().__init__(**kwargs)
+        #self.morphs = [cv2.MORPH_RECT,cv2.MORPH_CROSS,cv2.MORPH_ELLIPSE]
+    
+    def get_kernel(self):
+        #morph = random.choice(self.morphs)
+        ksize = random.choice([1,3])
+        #return cv2.getStructuringElement(morph, (ksize, ksize))
+        return ksize
+
+    def run(self,image):
+        kernel = self.get_kernel()
+        #image = cv2.erode(np.array(image),kernel,iterations=2)
+        return image.filter(PIL.ImageFilter.MaxFilter(kernel))
 
 
 class Overlay(Filter):
