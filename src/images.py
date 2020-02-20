@@ -59,7 +59,9 @@ class Component(BaseComponent):
             color_space = 'RGB'
         else:
             color_space = 'L'
-        self._img = PIL.Image.new(color_space, size, background_color)
+        color = node.get('background_color', None)
+        color = color or background_color
+        self._img = PIL.Image.new(color_space, size, color)
         self.elements = []
         self.node = node
 
@@ -90,6 +92,21 @@ class Component(BaseComponent):
     def add(self, *items):
         self.elements.append(tuple(items))
 
+    def check_position_for(self, x,y, component):
+        if self.elements:
+            last_component, last_pos = self.elements[-1]
+            if x == -3:
+                x = last_pos[0]+last_component.width
+            if y == -3 :
+                y = last_pos[1]+last_component.height
+        if x + component.width > self.size[0]:
+            logging.debug("Forcing position on x")
+            x = self.size[0] - component.width
+        if y + component.height > self.size[1]:
+            logging.debug("Forcing position on y")
+            y = self.size[1] - component.height
+
+        return x, y
 
 def get_components(node):
     elements = node.get('elements', None)
@@ -114,13 +131,14 @@ def get_components(node):
 def get_position_range(parent_size, node):
     width, height = parent_size
     position = node.get('position', dict())
-    x = position.get('x', [0, 1])
-    y = position.get('y', [0, 1])
+    x = position.get('x', 0)
+    y = position.get('y', 0)
     distribution = position.get('distribution', dict()).get('type', 'uniform')
-    if not isinstance(x, list):
+
+    if isinstance(x, (float, int)):
         x = [x, x]
 
-    if not isinstance(y, list):
+    if isinstance(y, (float, int)):
         y = [y, y]
 
     baseline_x = ceil(width * x[MIN])
@@ -128,8 +146,8 @@ def get_position_range(parent_size, node):
     max_x = ceil(x[MAX] * width)
     max_y = ceil(y[MAX] * height)
     try:
-        x = random.randint(baseline_x, min(baseline_x, max_x) + 1)
-        y = random.randint(baseline_y, min(baseline_y, max_y) + 1)
+        x = random.randint(baseline_x, max(baseline_x, max_x) + 1)
+        y = random.randint(baseline_y, max(baseline_y, max_y) + 1)
     except ValueError as e:
         logging.info("Illegal configuration (position")
 
@@ -174,6 +192,10 @@ def get_sizes(node):
             yield couple
 
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> Adds check for component position
 MIN = 0
 MAX = 1
 
@@ -227,16 +249,15 @@ class Generator:
 
             if roll() > gen.p:
                 continue
-            im = gen.generate(size)
+            component = gen.generate(size)
             node = gen.node
             x, y = get_position_range(size, node)
-            if x+im.width > size[0] or y + im.height > size[1]:
-                logging.warning("Placing Component outside image range")
+            x, y = img.check_position_for(x,y,component)
 
             # available_x -= x - baseline_x
             # available_y -= y - baseline_y
 
-            img.add(im, (x,y))
+            img.add(component, (x,y))
         img.render()
         return img
 
@@ -377,9 +398,9 @@ class Image(Generator):
         factors = next(self.sizes)
         size = [int(dim * factors[i]) for i, dim in enumerate(container_size)]
         spoilers = self.get_spoilers()
-        img = Component(size, self.node)
-        w_border = random.randint(1,5) #
-        h_border = random.randint(1,5)
+        img = Component(size, self.node, background_color=(255,255,255,255))
+        w_border = random.randint(5,15) #
+        h_border = random.randint(5,15)
 
         cropped = (size[0] - int(size[0] * w_border/100)), (size[1] - int(size[1]*h_border/100))
         im_size = original.size

@@ -22,7 +22,7 @@ def config_logger():
 def parse_options():
     parser = argparse.ArgumentParser(description='Generated text and images.')
     parser.add_argument('--config', required=True, help='path to YAML config file')
-    parser.add_argument('--workers', required=False, help='Number of workers', default=1)
+    parser.add_argument('--workers', required=False, type = int, help='Number of workers', default=1)
 
     parser.add_argument('--fonts', required=False, help='path of the list of fonts')
     parser.add_argument('--dir', required=True, help='path of the output directory')
@@ -82,7 +82,7 @@ def main():
 
     for i in range(n_workers):
         seed = random.randint(0,2**32-1)
-        visitors = [Spoiler()]
+        visitors = [Spoiler(), ]
         p = Process(target=gen_image_pool, args=(Generator(opt), visitors, vals[i], options, seed))
         p.start()
         processes.append(p)
