@@ -13,7 +13,7 @@ def config_logger():
     logger = logging.getLogger()
     logging.getLogger('PIL').setLevel(logging.ERROR)
     logger.setLevel(logging.DEBUG)
-    formatter = logging.Formatter('%(asctime)s %(levelname)s - [%(threadName)s] %(message)s')
+    formatter = logging.Formatter('%(asctime)s %(levelname)s - [%(process)s] %(message)s')
     stdout_handler = logging.StreamHandler(sys.stdout)
     stdout_handler.setFormatter(formatter)
     stdout_handler.setLevel(logging.DEBUG)

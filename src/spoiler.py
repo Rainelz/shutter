@@ -119,10 +119,14 @@ class Rotate(Filter):
 
 
 def _white_noise(width, height, m=0, M=255):
-    pil_map = PIL.Image.new("L", (width, height), 255)
-    random_grid = map(lambda x: random.randint(m, M), [0] * width * height)
+    w = width // 4
+    h = height // 4
+    # w = width
+    # h = height
+    pil_map = PIL.Image.new("L", (w, h), 255)
+    random_grid = map(lambda x: random.randint(m, M), [0] * w * h)
     pil_map.putdata(list(random_grid))
-    return pil_map
+    return pil_map.resize((width, height), PIL.Image.LINEAR)
 
 
 class Background(Filter):
@@ -130,9 +134,11 @@ class Background(Filter):
 
     def __init__(self, grey=DEFAULT_GREY, **kwargs):
         super().__init__(**kwargs)
-        self.grey = grey
+        self.grey = roll_value(grey)
 
     def run(self, image):
+        logging.debug(f"Running Background with grey {self.grey}")
+
         w, h = image.size
         noise = _white_noise(w, h, self.grey, 255)
         return PIL.ImageChops.darker(image, noise)
@@ -145,9 +151,11 @@ class Foreground(Filter):
 
     def __init__(self, grey=DEFAULT_GREY, **kwargs):
         super().__init__(**kwargs)
-        self.grey = grey
+        self.grey = roll_value(grey)
 
     def run(self, image):
+        logging.debug(f"Running Foreground with grey {self.grey}")
+
         w, h = image.size
         noise = _white_noise(w, h, 0, self.grey)
         return PIL.ImageChops.lighter(image, noise)
@@ -208,8 +216,11 @@ class Dilate(Filter):
         return image.filter(PIL.ImageFilter.MinFilter(kernel))
 
 class Erode(Filter):
-    def __init__(self,**kwargs):
+    DEFAULT_K = 3
+
+    def __init__(self,k=DEFAULT_K,**kwargs):
         super().__init__(**kwargs)
+        self.k = roll_value(k)
         #self.morphs = [cv2.MORPH_RECT,cv2.MORPH_CROSS,cv2.MORPH_ELLIPSE]
     
     def get_kernel(self):
@@ -221,7 +232,7 @@ class Erode(Filter):
     def run(self,image):
         kernel = self.get_kernel()
         #image = cv2.erode(np.array(image),kernel,iterations=2)
-        return image.filter(PIL.ImageFilter.MaxFilter(kernel))
+        return image.filter(PIL.ImageFilter.MaxFilter(self.k))
 
 
 class Overlay(Filter):

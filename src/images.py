@@ -192,10 +192,6 @@ def get_sizes(node):
             yield couple
 
 
-<<<<<<< HEAD
-=======
-
->>>>>>> Adds check for component position
 MIN = 0
 MAX = 1
 
