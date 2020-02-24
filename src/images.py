@@ -183,7 +183,7 @@ class Generator:
         self.sizes = get_sizes(node)
         self.generators = get_components(node)
         #assert all(gen.p == 1 for gen in self.generators) or sum(gen.p for gen in self.generators) == 1
-        self.p = node.get('probability',1)
+        self.p = node.get('probability', 1)
         self.components = []
 
     def __str__(self):
@@ -249,6 +249,8 @@ class Container(Generator):
         # total_units = 100
         # unit = (height // total_units)
         probs = [gen.p for gen in self.generators]
+        if sum(probs) != 1:
+            probs = None # undefined p, using uniform
         chosen = random.choice(self.generators, p=probs)
         im = chosen.generate(size)
         node = chosen.node
@@ -327,7 +329,7 @@ class TextGroup(Generator):
         return img
 
 
-class Text(Component):
+class Text(Generator):
     alignments = ['left', 'center', 'right']
 
     def __init__(self, size, font=PIL.ImageFont.truetype('Arial', 16), txt='Testo Prova   ', cfg=None):
@@ -395,18 +397,14 @@ class Image(Generator):
 # -- To be fixed
 class Table(Generator):
     def generate(self, container_size=None):
-        w_border = random.randint(5, 15)  # %
-        h_border = random.randint(5, 15)
-        w_border = 0
-        h_border = 0
+
         factors = next(self.sizes)
         size = [ceil(dim * factors[i]) for i, dim in enumerate(container_size)]
         compose_type = self.node.get('compose_type')
         img = Component(str(self), size, self.node, background_color=(255,))
-        cropped = (size[0] - int(size[0] * w_border / 100)), (size[1] - int(size[1] * h_border / 100))
+
         ## PASSARE A TABLE GEN IL TYPE DELLA TABELLA? IN BASE A QUELLO DECIDERE e passare il sottonodo
         t = Tablegen(size[0],size[1],compose_type,self.node)
-        #t.compose(img, ( (size[0]-cropped[0] ) // 2 , (size[1]-cropped[1] ) //2, *cropped))
         t.compose(img, (0,0,*size))
         img.render()
         return img
@@ -415,38 +413,6 @@ class Table(Generator):
 class Tablecells(Generator):
     def generate(self, container_size=None):
         return None
-
-class Footer(Generator):
-
-    def generate(self, container_size=None):
-        factors = next(self.sizes)
-        size = [int(dim * factors[i]) for i, dim in enumerate(container_size)]
-        spoilers = self.get_spoilers()
-        img = Component(str(self), size, self.node)
-        w_border = random.randint(5, 15)  # %
-        h_border = random.randint(5, 15)
-
-        width, height = size
-        total_units = 10
-        unit = (width // total_units)
-
-        long_el = 4 #  units
-        short_el = 0.5
-
-        l = Text((unit * long_el, height))
-        c = Text((unit * long_el, height), txt = 'ABCDEFGHIJKLMNOPQRSTUVZ')
-        r = Text((int(unit * short_el), height), txt='3/6')
-
-        c_pos = (l.width + random.randint(0, width - (l.width + c.width + r.width)), 0)
-        r_pos = (img.width - r.width, 0)
-
-        img.add(l, (0, 0))
-        img.add(c, c_pos)
-        img.add(r, r_pos)
-        img.render()
-        return img
-
-
 
 
 

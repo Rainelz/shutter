@@ -8,7 +8,7 @@ import logging
 import numpy.random as random
 import PIL, PIL.ImageFont, PIL.Image, PIL.ImageDraw, PIL.ImageChops, PIL.ImageOps, PIL.ImageFilter
 
-from dice_roller import roll, roll_value
+from dice_roller import roll, roll_value, get_value_generator
 from interfaces import Visitor
 from images import Component
 
@@ -25,7 +25,7 @@ class Spoiler(Visitor):
         self.filter_classes = local_classes
 
     def visit(self, component: Component):
-        """ Define spoiler base behavior, check node name and call its """
+        """ Define spoiler base behavior, check node name and call its constructor"""
         for el, _ in component.elements:
             self.visit(el)
             component.render()
@@ -60,6 +60,7 @@ class Filter:
 
 
 class Crop(Filter):
+    """Center Crop component"""
     DEFAULT_BORDER = 0
 
     def __init__(self, border=DEFAULT_BORDER, **kwargs):
@@ -82,6 +83,7 @@ class Crop(Filter):
 
 
 class Pad(Filter):
+    """Draw component border (outside)"""
     DEFAULT_N = 2
 
     def __init__(self, n=DEFAULT_N, **kwargs):
@@ -97,6 +99,7 @@ class Pad(Filter):
 
 
 class Rotate(Filter):
+    """Rotate image by angle"""
     DEFAULT_ANGLE = 0
 
     def __init__(self, angle=DEFAULT_ANGLE, **kwargs):
@@ -123,49 +126,54 @@ class Rotate(Filter):
 
 
 
-def _white_noise(width, height, m=0, M=255):
+def _white_noise(width, height, gray_p):
+    """Create downscaled noise grid """
     w = width // 4
     h = height // 4
     # w = width
     # h = height
     pil_map = PIL.Image.new("L", (w, h), 255)
-    random_grid = map(lambda x: random.randint(m, M), [0] * w * h)
+    values = get_value_generator(gray_p)
+    random_grid = map(lambda x: next(values), [0] * w * h)
     pil_map.putdata(list(random_grid))
     return pil_map.resize((width, height), PIL.Image.LINEAR)
 
 
 class Background(Filter):
-    DEFAULT_GREY=220
+    """Create noise grid and apply to background"""
+    DEFAULT_GREY=[220,255]
 
     def __init__(self, grey=DEFAULT_GREY, **kwargs):
         super().__init__(**kwargs)
-        self.grey = roll_value(grey)
+        self.grey = grey
 
     def run(self, image):
         logging.debug(f"Running Background with grey {self.grey}")
 
         w, h = image.size
-        noise = _white_noise(w, h, self.grey, 255)
+        noise = _white_noise(w, h, self.grey)
         return PIL.ImageChops.darker(image, noise)
 
 
 
 
 class Foreground(Filter):
-    DEFAULT_GREY=200
+    """Create noise grid and apply to foreground"""
+    DEFAULT_GREY=[0,200]
 
     def __init__(self, grey=DEFAULT_GREY, **kwargs):
         super().__init__(**kwargs)
-        self.grey = roll_value(grey)
+        self.grey = grey
 
     def run(self, image):
         logging.debug(f"Running Foreground with grey {self.grey}")
 
         w, h = image.size
-        noise = _white_noise(w, h, 0, self.grey)
+        noise = _white_noise(w, h, self.grey)
         return PIL.ImageChops.lighter(image, noise)
 
 class Blur(Filter):
+    """Apply blur noise"""
     DEFAULT_R = 2
 
     def __init__(self, r=DEFAULT_R, **kwargs):
@@ -178,6 +186,7 @@ class Blur(Filter):
 
 
 class Stroke(Filter):
+    """Draw random stroke"""
     def __init__(self, num_signs=None, num_strokes=None, step=None, **kwargs):
         super().__init__(*kwargs)
         self.num_signs = num_signs or random.randint(1, 6)
@@ -205,6 +214,7 @@ class Stroke(Filter):
         return image
 
 class Dilate(Filter):
+    """Dilate black blobs in component"""
     def __init__(self,**kwargs):
         super().__init__(**kwargs)
         #self.morphs = [cv2.MORPH_RECT,cv2.MORPH_CROSS,cv2.MORPH_ELLIPSE]
@@ -221,6 +231,7 @@ class Dilate(Filter):
         return image.filter(PIL.ImageFilter.MinFilter(kernel))
 
 class Erode(Filter):
+    """Erode black blobs in component"""
     DEFAULT_K = 3
 
     def __init__(self,k=DEFAULT_K,**kwargs):
@@ -241,6 +252,7 @@ class Erode(Filter):
 
 
 class Overlay(Filter):
+    """Random paste an image"""
     def __init__(self, path, size, probabilities=[], **kwargs):
         super().__init__(**kwargs)
         self.path = Path(path)
@@ -283,6 +295,7 @@ class Overlay(Filter):
 
 
 class VerticalLine(Filter):
+    """Draw a vertical line on the component"""
     def run(self, image):
         w, h = image.size
         try:
@@ -297,6 +310,7 @@ class VerticalLine(Filter):
         return image
 
 class Gradient(Filter):
+    """Apply a gradient foregound noise"""
     def __init__(self, gradient_magnitude=1., direction=0, color=0, **kwargs):
         super().__init__(**kwargs)
         self.gradient_mg = gradient_magnitude

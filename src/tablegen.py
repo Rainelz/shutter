@@ -9,7 +9,6 @@ import string
 import xml.etree.ElementTree as ET
 import os
 import math
-import cv2
 
 class Tablegen():
     
@@ -21,10 +20,10 @@ class Tablegen():
         self.compose_type = compose_type
 
         # --- general parameters which should be common for all configurations
-        self.min_font = int(node.get('font_min_size')) # 13
+        self.min_font = int(node.get('font_min_size', 14)) # 13
         self.base_font = max(self.min_font,self.height//80)
         self.min_tabletop = max(20,self.height//75)
-        self.pad_font_min_size = int(roll_value(node.get('font_delta_size')))
+        self.pad_font_min_size = int(roll_value(node.get('font_delta_size', 6)))
         # ---
         
         # --- can be loaded from a json file
