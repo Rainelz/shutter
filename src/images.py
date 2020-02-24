@@ -13,7 +13,7 @@ import numpy.random as random
 import textwrap
 
 from interfaces import BaseComponent
-from dice_roller import roll, roll_value, fn_map, SAMPLES
+from dice_roller import roll, roll_value, fn_map, SAMPLES, get_value_generator
 from tablegen import Tablegen
 
 
@@ -138,33 +138,9 @@ def get_sizes(node):
     height = size.get('height', 1)
 
     while True:
-        if isinstance(width, list):
-            assert(len(width) == 2)
+        ws = get_value_generator(width)
+        hs = get_value_generator(height)
 
-            ws = random.uniform(*width, SAMPLES)
-        elif isinstance(width, dict):
-            distribution = width.get('distribution', lambda *x: None)
-            pdf = fn_map[distribution]
-            args = width['mu'], width['sigma'], width['min'], width['max']
-            ws = pdf(*args, SAMPLES)
-            # import matplotlib.pyplot as plt
-            # plt.hist(ws, bins='auto')  # arguments are passed to np.histogram
-            # plt.title("Histogram with 'auto' bins")
-            # plt.show()
-
-        else:
-            ws = np.full(SAMPLES, fill_value=width)
-
-        if isinstance(height, list):
-            assert (len(height) == 2)
-            hs = random.uniform(*height, SAMPLES)
-        elif isinstance(height, dict):
-            distribution = height.get('distribution', 'uniform')
-            pdf = fn_map[distribution]
-            args = height['mu'], height['sigma'], height['min'], height['max']
-            hs = pdf(*args, SAMPLES)
-        else:
-            hs = np.full(SAMPLES, fill_value=height)
         for couple in zip(ws, hs):
             yield couple
 
@@ -211,7 +187,7 @@ class Generator:
         if container_size is not None:
             size = [int(dim * size[i]) for i, dim in enumerate(container_size)]
         size = int(size[0]), int(size[1])
-        #logging.info(f"Generating image with size {size}")
+        logging.info(f"Generating image with size {size}")
 #        spoilers = self.get_spoilers()
         img = Component(str(self), size, self.node)
         available_x, available_y = width, height = size
@@ -243,7 +219,7 @@ class Container(Generator):
         if container_size is not None:
             size = [int(dim * size[i]) for i, dim in enumerate(container_size)]
         size = int(size[0]), int(size[1])
-        logging.info(f"Generating image with size {size}")
+        logging.debug(f"Generating container with size {size}")
         img = Component(str(self), size, self.node)
         available_x, available_y = width, height = size
         # total_units = 100
@@ -262,6 +238,7 @@ class Container(Generator):
 
 class TextGroup(Generator):
     font_sizes = [18,20, 22, 24]
+    font_sizes = [50]
 
     def __init__(self, opt):
         super().__init__(opt)
@@ -298,14 +275,7 @@ class TextGroup(Generator):
         height = random.choice(TextGroup.font_sizes)
         font_name = random.choice(fonts)
         font = PIL.ImageFont.truetype(font_name, height)
-        #n_lines = roll_value(self.node)
-        #ascent, descent = font.getmetrics()
-
-        # line_height = ascent + descent
-        # n_lines = size[1] // line_height
-        # start = random.randint(0, max(1,len(lorem_ipsum.text) - n_lines))
-        # text = lorem_ipsum.text[start: start + n_lines] #dataloader.get_lines(n_lines)
-        # text = '\n'.join(text)
+        n_lines = roll_value(self.n_lines)
 
         w_border = random.randint(5, 15)  # %
         h_border = random.randint(5, 15)
@@ -315,16 +285,17 @@ class TextGroup(Generator):
         draw = ImageDraw.Draw(img)
         offset = h_border
         width, l_height = font.getsize('Ag')
-        width = int(cropped[0]//width*3.5)
+        width = int(cropped[0]//width*2)
 
         text_gen = self.text_gen()
-        while offset + l_height < cropped[1]:
+        while offset + l_height < cropped[1] and n_lines != 0:
 
             for line in textwrap.wrap(next(text_gen), width=width):
                 l_height=font.getsize(line)[1]
-                if offset + l_height > cropped[1]:
+                if offset + l_height > cropped[1] or n_lines==0:
                     break
                 draw.text(((size[0]-cropped[0])//2, offset), line, font=font, fill=0)
+                n_lines -= 1
                 offset += l_height
         return img
 

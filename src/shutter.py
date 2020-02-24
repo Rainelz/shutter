@@ -38,8 +38,8 @@ def parse_options():
 def gen_image(image_generator, visitors, options, i):
     logging.info(f"{i + 1}/{options.size}")
 
-    img_file = '%s/%04d.png' % (options.dir, i)
-    truth_file = '%s/GT/%04d_GT.png' % (options.dir, i)
+    img_file = '%s/spoiled/%04d.png' % (options.dir, i)
+    truth_file = '%s/original/%04d_GT.png' % (options.dir, i)
 
     image = image_generator.generate()
     image.save(truth_file, dpi=(300, 300))
@@ -66,7 +66,9 @@ def main():
             logging.exception(exc)
             exit(1)
 
-    os.makedirs(f"{options.dir}/GT", exist_ok=True)
+    os.makedirs(f"{options.dir}/original", exist_ok=True)
+    os.makedirs(f"{options.dir}/spoiled", exist_ok=True)
+
     seed = opt.get('seed', None)
     if not seed:
         seed = random.randint(0, 2**32-1)
