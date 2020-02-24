@@ -1,14 +1,17 @@
 from __future__ import annotations
 from functools import wraps
-import PIL.Image
-from PIL import ImageDraw
-import numpy as np
-import numpy.random as random
+import sys
 import inspect
 import logging
-from pathlib import Path
-import textwrap
 from abc import ABC, abstractmethod
+from pathlib import Path
+
+import PIL.Image
+from PIL import ImageDraw
+
+import numpy as np
+import numpy.random as random
+import textwrap
 
 from dice_roller import roll, roll_value, fn_map, SAMPLES
 from tablegen import Tablegen
@@ -54,11 +57,13 @@ class Component(BaseComponent):
 
     """
 
-    def __init__(self, size, node, background_color=(255,255,255,255)):
+    def __init__(self, type, size, node, background_color=(255,255,255,255)):
         if len(background_color) > 1:
             color_space = 'RGB'
         else:
             color_space = 'L'
+
+        self.type = type
         color = node.get('background_color', None)
         color = color or background_color
         self._img = PIL.Image.new(color_space, size, color)
@@ -109,10 +114,10 @@ class Component(BaseComponent):
         return x, y
 
 def get_components(node):
-    elements = node.get('elements', None)
+    elements = node.get('elements', None) # iterate over yaml nodes
     if elements is None:
         return []
-    import sys
+    # create dict class name - constructor
     local_classes = inspect.getmembers(sys.modules[__name__], inspect.isclass)
     local_classes = {name: cls for name, cls in local_classes
                      if name not in ['BaseComponent', 'ABC'] and not inspect.isabstract(cls)}
@@ -121,7 +126,7 @@ def get_components(node):
         class_name = list(el.keys())[0]
         if class_name in local_classes.keys():
             cls = local_classes[class_name]
-            objects.append(cls(el))
+            objects.append(cls(el)) # create generator object
         else:
             raise AttributeError("error instantiating element", el)
 
@@ -236,7 +241,7 @@ class Generator:
         size = int(size[0]), int(size[1])
         #logging.info(f"Generating image with size {size}")
 #        spoilers = self.get_spoilers()
-        img = Component(size, self.node)
+        img = Component(str(self), size, self.node)
         available_x, available_y = width, height = size
         # total_units = 100
         # unit = (height // total_units)
@@ -267,7 +272,7 @@ class Container(Generator):
             size = [int(dim * size[i]) for i, dim in enumerate(container_size)]
         size = int(size[0]), int(size[1])
         logging.info(f"Generating image with size {size}")
-        img = Component(size, self.node)
+        img = Component(str(self), size, self.node)
         available_x, available_y = width, height = size
         # total_units = 100
         # unit = (height // total_units)
@@ -315,7 +320,7 @@ class TextGroup(Generator):
         factors = next(self.sizes)
         size = [int(dim*factors[i]) for i, dim in enumerate(container_size)]
         #spoilers = self.get_spoilers()
-        img = Component(size, self.node)
+        img = Component(str(self), size, self.node)
         height = random.choice(TextGroup.font_sizes)
         font_name = random.choice(fonts)
         font = PIL.ImageFont.truetype(font_name, height)
@@ -394,7 +399,7 @@ class Image(Generator):
         factors = next(self.sizes)
         size = [int(dim * factors[i]) for i, dim in enumerate(container_size)]
         spoilers = self.get_spoilers()
-        img = Component(size, self.node, background_color=(255,255,255,255))
+        img = Component(str(self), size, self.node, background_color=(255,255,255,255))
         w_border = random.randint(5,15) #
         h_border = random.randint(5,15)
 
@@ -425,7 +430,7 @@ class Table(Generator):
         factors = next(self.sizes)
         size = [ceil(dim * factors[i]) for i, dim in enumerate(container_size)]
         compose_type = self.node.get('compose_type')
-        img = Component(size, self.node, background_color=(255,))
+        img = Component(str(self), size, self.node, background_color=(255,))
         cropped = (size[0] - int(size[0] * w_border / 100)), (size[1] - int(size[1] * h_border / 100))
         ## PASSARE A TABLE GEN IL TYPE DELLA TABELLA? IN BASE A QUELLO DECIDERE e passare il sottonodo
         t = Tablegen(size[0],size[1],compose_type,self.node)
@@ -445,7 +450,7 @@ class Footer(Generator):
         factors = next(self.sizes)
         size = [int(dim * factors[i]) for i, dim in enumerate(container_size)]
         spoilers = self.get_spoilers()
-        img = Component(size, self.node)
+        img = Component(str(self), size, self.node)
         w_border = random.randint(5, 15)  # %
         h_border = random.randint(5, 15)
 
