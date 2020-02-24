@@ -1,19 +1,23 @@
 from __future__ import annotations
-import numpy.random as random
-import PIL, PIL.ImageFont, PIL.Image, PIL.ImageDraw, PIL.ImageChops, PIL.ImageOps, PIL.ImageFilter
+
 from pathlib import Path
 import math
 import inspect
 import logging
+
+import numpy.random as random
+import PIL, PIL.ImageFont, PIL.Image, PIL.ImageDraw, PIL.ImageChops, PIL.ImageOps, PIL.ImageFilter
+
 from dice_roller import roll, roll_value
-from images import Visitor
+from interfaces import Visitor
 from images import Component
-import cv2
-import numpy
 
 
 class Spoiler(Visitor):
     def __init__(self):
+        """
+        Loads implemented spoilers using reflection on the module
+        """
         import sys
         local_classes = inspect.getmembers(sys.modules[__name__], inspect.isclass)
         local_classes = {name: cls for name, cls in local_classes
@@ -21,6 +25,7 @@ class Spoiler(Visitor):
         self.filter_classes = local_classes
 
     def visit(self, component: Component):
+        """ Define spoiler base behavior, check node name and call its """
         for el, _ in component.elements:
             self.visit(el)
             component.render()

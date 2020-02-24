@@ -1,10 +1,9 @@
-from __future__ import annotations
 from functools import wraps
 import sys
 import inspect
 import logging
-from abc import ABC, abstractmethod
 from pathlib import Path
+from math import ceil
 
 import PIL.Image
 from PIL import ImageDraw
@@ -13,38 +12,11 @@ import numpy as np
 import numpy.random as random
 import textwrap
 
+from interfaces import BaseComponent
 from dice_roller import roll, roll_value, fn_map, SAMPLES
 from tablegen import Tablegen
-from math import ceil
 
 
-class BaseComponent(ABC):
-    """
-    Abstract class defining the component interface for visitors
-    """
-    elements = NotImplemented
-    node = NotImplemented
-
-    @abstractmethod
-    def update(self, val):
-        pass
-
-    def accept(self, visitor: Visitor):
-
-        return visitor.visit(self)
-
-
-class Visitor(ABC):
-
-    @abstractmethod
-    def visit(self, component: BaseComponent):
-        pass
-
-
-class Exporter(Visitor):
-    def visit(self, component: BaseComponent, *kwargs):
-        if len(component.elements) == 0:
-            return
     #
     # def should_visit_leaves(self):
     #     return False
