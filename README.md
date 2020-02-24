@@ -6,9 +6,10 @@ This project implements the Composite Pattern (for generating images) + Visitor 
 
 The tool loads a YAML configuration file where each component is defined along with the optional noises to apply on the component as well as the probability distributions of various parameters.
 
-run with `python src/shutter.py --config $CONFIG_FILE --size $K --dir $PATH_TO_OUT_DIR`
+run with `python src/shutter.py --config $CONFIG_FILE --size $K --dir $PATH_TO_OUT_DIR --workers N`
 
 Example configurations available - [config.yml](configs/config-2.yml)
+
 # Available Components
 Each component has a default generation probability of 1. Overriding the default behaviour results in optional components.
 See [Container](#container) for mutual exclusion.
@@ -84,4 +85,19 @@ Defines a Component generator which will produce images with:
 **width** sampled from a normal distribution with μ = 1000, σ=100 truncated in the interval [800, 1200]
 
 **height** sampled from a uniform distribution in the interval [1000, 1800]
+
+# Create custom Component
+
+To implement a custom component you will have to extend the Generator class.
+
+A generator takes its yaml node as argument from which it can take initialization parameters and store relevant informations
+for the actual generation step.
+
+In the generate function, you basically pop random values and return a drawn component which will contain useful informations
+for future spoilers. 
+
+To pop a random value for a parameter (node with param name and distribution values): just call the roll_value function 
+and pass the node as argument.
+
+
 
