@@ -2,7 +2,7 @@
 
 
 A Python Tool for the generation of images with different layouts and noise combinations.
-This project implements the Composite Pattern (for generating images) + Visitor Pattern (to apply different spoilers -independentely- or to navigate the structure [ TODO xml exporter ]).
+This project implements the Composite Pattern (for generating images) + Visitor Pattern (to apply different spoilers -independentely- or to navigate the structure).
 
 The tool loads a YAML configuration file where each component is defined along with the optional noises to apply on the component as well as the probability distributions of various parameters.
 
@@ -18,10 +18,10 @@ See [Container](#container) for mutual exclusion.
 The basic component to play with in shutter. Defines its size (eventually a position relative to a parent) and a list of sub-components.
 
 ## TextGroup
-A block of text. Loads lazily random text from a required `source_path``
+A block of text. Loads lazily random text from a `source_path` or fixed text taken from the yaml.`
 
 ## Image
-An image that can be sampled from a set or be constant. if `files` is defined, `path` points to a folder where to find the files and `probabilities` defines a list of entries like `<file, likelihood to be selected>`
+An image that can be sampled from a set or be constant. if `files` is defined, `path` points to a folder where to find the files and `probabilities` defines a list of entries like `<file, likelihood to be selected>` see example in [config.yml] (configs/config-2.yml)
 
 ## Footer
 A pre-defined component for common page footers.
@@ -35,7 +35,6 @@ A logical container useful to define mutually exclusive Components. The configur
 Each of the defined Component can define a list of accepted spoilers and the associated likelihood.
 
 ## Available Spoilers
-TODO add spoiler params in yaml  
 ### Crop
 Crops an external white border (if available) of the component.
 
@@ -43,7 +42,7 @@ Crops an external white border (if available) of the component.
 Adds an external black border to the component.
 
 ### Rotate
-Rotates the component by a random angle.
+Rotates the component by a random angle and crops the resulting image.
 
 ### Background
 Adds random noise to the background of the component.
@@ -51,8 +50,11 @@ Adds random noise to the background of the component.
 ### Foreground
 Adds random noise to the foreground of the component.
 
+### SaltPepper
+Adds salt and pepper noise to the image
+
 ### Blur
-Blurs the component by radius `r` # TODO
+Blurs the component by radius `r`
 
 ### Stroke
 Adds a randomly moved line to the component.
@@ -86,6 +88,12 @@ Defines a Component generator which will produce images with:
 
 **height** sampled from a uniform distribution in the interval [1000, 1800]
 
+# Exporters
+
+Currently only a local JSON exporter is implemented. This means that each coordinate is exported with respect to its frame origin.
+The Local exporter dumps generation and spoilers informations such as type of component, size, applied spoilers, rolled values (when available) and data contained.
+More to come...
+
 # Create custom Component
 
 To implement a custom component you will have to extend the Generator class.
@@ -100,4 +108,6 @@ To pop a random value for a parameter (node with param name and distribution val
 and pass the node as argument.
 
 
+# Create custom Spoiler
 
+# Create custom Exporter
