@@ -4,8 +4,9 @@ import os, logging, sys
 from multiprocessing import Process
 import yaml
 
-from images import Generator
+from generators import Generator
 from spoiler import Spoiler
+from exporter import LocalExporter
 
 
 
@@ -23,6 +24,7 @@ def parse_options():
     parser = argparse.ArgumentParser(description='Generated text and images.')
     parser.add_argument('--config', required=True, help='path to YAML config file')
     parser.add_argument('--workers', required=False, type = int, help='Number of workers', default=1)
+    parser.add_argument('--out-name', required=False, type = str, help='Base name for output files', default='img')
 
     parser.add_argument('--fonts', required=False, help='path of the list of fonts')
     parser.add_argument('--dir', required=True, help='path of the output directory')
@@ -36,17 +38,17 @@ def parse_options():
 
 
 def gen_image(image_generator, visitors, options, i):
-    logging.info(f"{i + 1}/{options.size}")
+    logging.info(f"{i}/{options.size:04}")
 
-    img_file = '%s/spoiled/%04d.png' % (options.dir, i)
-    truth_file = '%s/original/%04d_GT.png' % (options.dir, i)
+    img_file = '%s/spoiled/%s.png' % (options.dir, i)
+    truth_file = '%s/original/%s.png' % (options.dir, i)
 
     image = image_generator.generate()
     image.save(truth_file, dpi=(300, 300))
 
     logging.info("Generated Image. Applying spoilers")
     for visitor in visitors:
-        image.accept(visitor)
+        image.accept(visitor, file_name=str(i))
 
     image.save(img_file, dpi=(options.dpi, options.dpi))
 
@@ -65,9 +67,12 @@ def main():
         except yaml.YAMLError as exc:
             logging.exception(exc)
             exit(1)
-
-    os.makedirs(f"{options.dir}/original", exist_ok=True)
-    os.makedirs(f"{options.dir}/spoiled", exist_ok=True)
+    gt_dir = f"{options.dir}/original"
+    data_dir = f"{options.dir}/spoiled"
+    ann_dir = f"{options.dir}/annotations"
+    os.makedirs(data_dir, exist_ok=True)
+    os.makedirs(gt_dir, exist_ok=True)
+    os.makedirs(ann_dir, exist_ok=True)
 
     seed = opt.get('seed', None)
     if not seed:
@@ -77,14 +82,14 @@ def main():
     n_workers= options.workers
     filler = [None for _ in range(n_workers - (options.size % n_workers))]
     vals = np.concatenate([np.arange(options.size), filler]).reshape(-1, n_workers).transpose()
-    vals = [[val for val in values if val is not None] for values in vals]
+    vals = [[f'{options.out_name}_{val:04}' for val in values if val is not None] for values in vals]
     processes = []
 
     random.seed(seed)
 
     for i in range(n_workers):
         seed = random.randint(0,2**32-1)
-        visitors = [Spoiler(), ]
+        visitors = [Spoiler(), LocalExporter(path=ann_dir)]
         p = Process(target=gen_image_pool, args=(Generator(opt), visitors, vals[i], options, seed))
         p.start()
         processes.append(p)

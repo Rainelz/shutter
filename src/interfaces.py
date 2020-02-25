@@ -8,24 +8,20 @@ class BaseComponent(ABC):
     """
     elements = NotImplemented
     node = NotImplemented
-
+    data = NotImplemented
     @abstractmethod
     def update(self, val):
         pass
 
-    def accept(self, visitor: Visitor):
+    def accept(self, visitor: Visitor, **kwargs):
 
-        return visitor.visit(self)
+        return visitor.visit(self, **kwargs)
 
 
 class Visitor(ABC):
 
     @abstractmethod
-    def visit(self, component: BaseComponent):
+    def visit(self, component: BaseComponent, **kwargs):
         pass
 
 
-class Exporter(Visitor):
-    def visit(self, component: BaseComponent, *kwargs):
-        if len(component.elements) == 0:
-            return

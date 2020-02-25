@@ -4,7 +4,7 @@ import inspect
 import logging
 from pathlib import Path
 from math import ceil
-
+from collections import defaultdict
 import PIL.Image
 from PIL import ImageDraw
 
@@ -40,6 +40,7 @@ class Component(BaseComponent):
         color = color or background_color
         self._img = PIL.Image.new(color_space, size, color)
         self.elements = []
+        self.data = defaultdict(list)
         self.node = node
 
     def __getattr__(self, item):
@@ -54,7 +55,7 @@ class Component(BaseComponent):
             return attr
 
     def __str__(self):
-        return self.__class__.__name__
+        return str(self.__class__.__name__)
 
     def update(self, im):
         "Updates internal image"
@@ -163,7 +164,7 @@ class Generator:
         self.components = []
 
     def __str__(self):
-        return self.__class__.__name__
+        return str(self.__class__.__name__)
 
     def get_spoilers(self):
         noises = []
@@ -283,20 +284,24 @@ class TextGroup(Generator):
         cropped = (size[0] - int(size[0] * w_border / 100)), (size[1] - int(size[1] * h_border / 100))
 
         draw = ImageDraw.Draw(img)
-        offset = h_border
+        y = h_border
         width, l_height = font.getsize('Ag')
         width = int(cropped[0]//width*2)
 
         text_gen = self.text_gen()
-        while offset + l_height < cropped[1] and n_lines != 0:
+
+        x = (size[0] - cropped[0]) // 2
+
+        while y + l_height < cropped[1] and n_lines != 0:
 
             for line in textwrap.wrap(next(text_gen), width=width):
-                l_height=font.getsize(line)[1]
-                if offset + l_height > cropped[1] or n_lines==0:
+                l_height = font.getsize(line)[1]
+                if y + l_height > cropped[1] or n_lines==0:
                     break
-                draw.text(((size[0]-cropped[0])//2, offset), line, font=font, fill=0)
+                img.data['data'].append({'text': line, 'box': [x, y, width, l_height]})
+                draw.text((x, y), line, font=font, fill=0)
                 n_lines -= 1
-                offset += l_height
+                y += l_height
         return img
 
 

@@ -5,12 +5,13 @@ import math
 import inspect
 import logging
 
+import numpy as np
 import numpy.random as random
 import PIL, PIL.ImageFont, PIL.Image, PIL.ImageDraw, PIL.ImageChops, PIL.ImageOps, PIL.ImageFilter
 
 from dice_roller import roll, roll_value, get_value_generator
 from interfaces import Visitor
-from images import Component
+from generators import Component
 
 
 class Spoiler(Visitor):
@@ -24,8 +25,8 @@ class Spoiler(Visitor):
                          if name not in ['Spoiler', 'Component']  and not inspect.isabstract(cls)}
         self.filter_classes = local_classes
 
-    def visit(self, component: Component):
-        """ Define spoiler base behavior, check node name and call its constructor"""
+    def visit(self, component: Component, **kwargs):
+        """ Define spoiler base behavior, visit leaves, check node name and call its constructor"""
         for el, _ in component.elements:
             self.visit(el)
             component.render()
@@ -47,6 +48,12 @@ class Filter:
     def __init__(self, p=1, **_):
         assert 0 <= p <= 1
         self.p = p
+
+    def type(self):
+        return str(self.__class__.__name__)
+
+    def annotate(self, component: Component, data):
+        component.data['spoilers'].append(data)
 
     def roll_and_run(self, image: Component):
         """Rolls and eventually applies the filter"""
@@ -74,11 +81,15 @@ class Crop(Filter):
         diff = PIL.ImageChops.difference(image, blank)
         if diff.getbbox() is None:
             return image
+
+
         box = list(diff.getbbox()) #x,y, x2, y2
         box[0] -= self.border + 10
         box[1] -= (10 + self.border * 3)
         box[2] += self.border + 10
         box[3] += (10 + self.border * 3)
+        data = {'type': self.type, 'box':box}
+        self.annotate(image, data)
         return image.crop(tuple(box))
 
 
@@ -92,9 +103,12 @@ class Pad(Filter):
 
     def run(self, image):
         logging.debug(f"Running Pad with n:{self.n}")
+        n = roll_value(self.n)
         w, h = image.size
-        bg = PIL.Image.new(image.mode, (w + 2 * self.n, h + 2 * self.n), 0)
-        bg.paste(image, (self.n, self.n))
+        data = {'type': self.type(), 'n': n}
+        self.annotate(image, data)
+        bg = PIL.Image.new(image.mode, (w + 2 * n, h + 2 * n), 0)
+        bg.paste(image, (n, n))
         return bg
 
 
@@ -104,32 +118,36 @@ class Rotate(Filter):
 
     def __init__(self, angle=DEFAULT_ANGLE, **kwargs):
         super().__init__(**kwargs)
-        self.angle = round(roll_value(angle), 1)
-        alpha = math.pi * self.angle / 180
-        self.c = abs(math.cos(alpha))
-        self.s = abs(math.sin(alpha))
+        self.angle = angle
 
-    def center_box(self, outer, inner):
+
+    def center_box(self, outer, inner, c, s):
         W, H = outer
         w, h = inner
-        w1 = int(self.c * w + self.s * h) + 1
-        h1 = int(self.s * w + self.c * h) + 1
+        w1 = int(c * w + s * h) + 1
+        h1 = int(s * w + c * h) + 1
         return ((W - w1) // 2, (H - h1) // 2, (W - w1) // 2 + w1, (H - h1) // 2 + h1)
 
     def run(self, image):
-        logging.debug(f"Running Rotate with angle {self.angle}")
+        angle = round(roll_value(self.angle), 1)
+        alpha = math.pi * angle / 180
+        c = abs(math.cos(alpha))
+        s = abs(math.sin(alpha))
+        logging.debug(f"Running Rotate with angle {angle}")
         #TODO check this
         #rotated = Pad(100).run(image).convert('RGBA').rotate(self.angle, expand = 1)
-        rotated = image.convert('RGBA').rotate(self.angle, resample=PIL.Image.BICUBIC, expand=True, fillcolor='white',)
-        box = self.center_box(rotated.size, image.size)
+        rotated = image.convert('RGBA').rotate(angle, resample=PIL.Image.BICUBIC, expand=True, fillcolor='white',)
+        box = self.center_box(rotated.size, image.size, c, s)
+        data = {'type': self.type(), 'angle': angle}
+        self.annotate(image, data)
         return rotated.crop(box)
 
 
 
 def _white_noise(width, height, gray_p):
     """Create downscaled noise grid """
-    w = width // 4
-    h = height // 4
+    w = width // 8
+    h = height // 8
     # w = width
     # h = height
     pil_map = PIL.Image.new("L", (w, h), 255)
@@ -152,6 +170,8 @@ class Background(Filter):
 
         w, h = image.size
         noise = _white_noise(w, h, self.grey)
+        data = {'type': self.type(), 'grey': self.grey}
+        self.annotate(image, data)
         return PIL.ImageChops.darker(image, noise)
 
 
@@ -170,6 +190,8 @@ class Foreground(Filter):
 
         w, h = image.size
         noise = _white_noise(w, h, self.grey)
+        data = {'type': self.type(), 'grey': self.grey}
+        self.annotate(image, data)
         return PIL.ImageChops.lighter(image, noise)
 
 class Blur(Filter):
@@ -178,11 +200,46 @@ class Blur(Filter):
 
     def __init__(self, r=DEFAULT_R, **kwargs):
         super().__init__(**kwargs)
-        self.r = roll_value(r)
+        self.r = r
 
     def run(self, image):
-        logging.debug(f"Running Blur with radius {self.r}")
-        return image.filter(PIL.ImageFilter.GaussianBlur(self.r))
+        r = roll_value(self.r)
+        logging.debug(f"Running Blur with radius {r}")
+        data = {'type': self.type(), 'r': r}
+        self.annotate(image, data)
+        return image.filter(PIL.ImageFilter.GaussianBlur(r))
+
+class SaltPepper(Filter):
+    DEF_DENSITY=50
+
+    def __init__(self, density=DEF_DENSITY, **kwargs):
+        super().__init__(*kwargs)
+        self.density = density
+
+    def run(self, image):
+        density = roll_value(self.density)
+        w,h = image.size
+        w = w//4
+        h = h//4
+        s_vs_p = 1
+        amount = 0.4
+        out = np.copy(np.array(image))
+        # Salt mode
+        num_salt = np.ceil(amount * w*h * s_vs_p)
+        coords = [np.random.randint(0, i - 1, int(num_salt))
+                  for i in image.size]
+        coords = tuple((coords[1], coords[0]))
+        #coords = [coord[1], coord[0] for coord in coords]
+        out[coords] = 1
+
+        # Pepper mode
+        num_pepper = np.ceil(amount * w*h * (1. - s_vs_p))
+        coords = [np.random.randint(0, i - 1, int(num_pepper))
+                  for i in image.size]
+        coords = tuple((coords[1], coords[0]))
+
+        out[coords] = 0
+        return PIL.ImageChops.darker(image, PIL.Image.fromarray(out).resize(image.size, PIL.Image.LINEAR))
 
 
 class Stroke(Filter):
@@ -236,7 +293,7 @@ class Erode(Filter):
 
     def __init__(self,k=DEFAULT_K,**kwargs):
         super().__init__(**kwargs)
-        self.k = roll_value(k)
+        self.k = k
         #self.morphs = [cv2.MORPH_RECT,cv2.MORPH_CROSS,cv2.MORPH_ELLIPSE]
     
     def get_kernel(self):
@@ -247,6 +304,9 @@ class Erode(Filter):
 
     def run(self,image):
         kernel = self.get_kernel()
+        k = roll_value(self.k)
+        data = {'type': self.type(), 'k': k}
+        self.annotate(image, data)
         #image = cv2.erode(np.array(image),kernel,iterations=2)
         return image.filter(PIL.ImageFilter.MaxFilter(self.k))
 
@@ -267,7 +327,7 @@ class Overlay(Filter):
         w1 = random.randint(0, w - overlay.width)
         h1 = random.randint(0, h - overlay.height)
         bg.paste(overlay, (w1, h1))
-        return bg
+        return bg, (w1, h1)
 
     def run(self, image):
         if self.path.is_dir():
@@ -286,7 +346,9 @@ class Overlay(Filter):
 
         overlay = PIL.Image.open(file_path).convert('L').resize((self.w, self.h))
 
-        overlay = Overlay.pad_overlay_at(overlay, image.size)
+        overlay, pos = Overlay.pad_overlay_at(overlay, image.size)
+        data = {'type': self.type(), 'fname': file_path.name, 'box':[*pos, self.w, self.h] }
+        self.annotate(image, data)
         return PIL.ImageChops.darker(image, overlay)
 
     @staticmethod
@@ -304,6 +366,8 @@ class VerticalLine(Filter):
             x = random.randint(0, w)
             draw = PIL.ImageDraw.Draw(image)
             draw.line((x, a, x, b), fill=30, width=4)
+            data = {'type': self.type(), 'pos': [x,a,x,b], 'fill':30, 'width' : 4 }
+            self.annotate(image, data)
         except Exception as e:
             print(e)
             return image
@@ -359,36 +423,36 @@ class Gradient(Filter):
     #     color = random.randint(100, 200)
     #     return Gradient(grad/10, dir, color)
 
-def filters_from_cfg(cfg):
-    filters = [
-        Pad.random(),
-        Foreground.random(),
-        Blur.random(),
-        Stroke.random(),
-        VerticalLine.random(),
-        Overlay.random('resources/stamps', (100, 100)),
-        Gradient.random(),
-        Rotate.random(),
-        Background.random()
-    ]
-    return filters
-
-def spoil(im, options):
-    im = Crop.random().run(im)
-    filters = [
-        VerticalLine.random(),
-        Overlay.random('resources/stamps', (100, 100)),
-        Rotate.random() if not options.no_skew else Filter(),
-        Pad.random(),
-        Background.random(),
-        Foreground.random(),
-        Stroke.random(),
-        Blur.random(),
-        #Gradient.random()
-    ]
-
-    noisy = im
-    for f in filters:
-        noisy = f.run(noisy)
-        
-    return noisy
+# def filters_from_cfg(cfg):
+#     filters = [
+#         Pad.random(),
+#         Foreground.random(),
+#         Blur.random(),
+#         Stroke.random(),
+#         VerticalLine.random(),
+#         Overlay.random('resources/stamps', (100, 100)),
+#         Gradient.random(),
+#         Rotate.random(),
+#         Background.random()
+#     ]
+#     return filters
+#
+# def spoil(im, options):
+#     im = Crop.random().run(im)
+#     filters = [
+#         VerticalLine.random(),
+#         Overlay.random('resources/stamps', (100, 100)),
+#         Rotate.random() if not options.no_skew else Filter(),
+#         Pad.random(),
+#         Background.random(),
+#         Foreground.random(),
+#         Stroke.random(),
+#         Blur.random(),
+#         #Gradient.random()
+#     ]
+#
+#     noisy = im
+#     for f in filters:
+#         noisy = f.run(noisy)
+#
+#     return noisy

@@ -50,4 +50,6 @@ def roll():
 
 
 def roll_value(node):
+    "Pops a number in a given distribution"
     return next(get_value_generator(node))
+
