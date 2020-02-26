@@ -105,29 +105,50 @@ def get_components(node):
 
     return objects
 
-
-def get_position_range(parent_size, node):
-    width, height = parent_size
-    position = node.get('position', dict())
+# TODO refactor this
+def get_position_range(component, container_size):
+    parent_w, parent_h = container_size
+    width, height = component.size
+    position = component.node.get('position', dict())
     x = position.get('x', 0)
     y = position.get('y', 0)
-    distribution = position.get('distribution', dict()).get('type', 'uniform')
+
+    if isinstance(x, str):
+        if x == 'head':
+            x = 0
+        elif x == 'center':
+            x = (parent_w - width) // 2
+        elif x == 'tail':
+            x = parent_w - width
+        else:
+            raise ValueError(f'Unsupported position value: {x}')
+        x /= parent_w  # result in % relative to parent
+
+    if isinstance(y, str):
+        if y == 'head':
+            y = 0
+        elif y == 'center':
+            y = (parent_h - height) // 2
+        elif y == 'tail':
+            y = parent_h-height
+        else:
+            raise ValueError(f'Unsupported position value: {y}')
+        y /= parent_h
 
     if isinstance(x, (float, int)):
         x = [x, x]
 
     if isinstance(y, (float, int)):
         y = [y, y]
-
-    baseline_x = ceil(width * x[MIN])
-    baseline_y = ceil(height * y[MIN])
-    max_x = ceil(x[MAX] * width)
-    max_y = ceil(y[MAX] * height)
+    baseline_x = ceil(parent_w * x[MIN])
+    baseline_y = ceil(parent_h * y[MIN])
+    max_x = ceil(x[MAX] * parent_w)
+    max_y = ceil(y[MAX] * parent_h)
     try:
         x = random.randint(baseline_x, max(baseline_x, max_x) + 1)
         y = random.randint(baseline_y, max(baseline_y, max_y) + 1)
     except ValueError as e:
-        logging.info("Illegal configuration (position")
+        logging.info("Illegal configuration position")
 
     return x, y
 
@@ -201,7 +222,7 @@ class Generator:
                 continue
             component = gen.generate(size)
             node = gen.node
-            x, y = get_position_range(size, node)
+            x, y = get_position_range(component, size)
             x, y = img.check_position_for(x,y,component)
 
             # available_x -= x - baseline_x
@@ -238,13 +259,14 @@ class Container(Generator):
 
 
 class TextGroup(Generator):
-    font_sizes = [18,20, 22, 24]
-    font_sizes = [50]
+    font_sizes = [30, 38, 44, 52]
+    #font_sizes = [50]
 
     def __init__(self, opt):
         super().__init__(opt)
         self.data_path = self.node.get('source_path', None)
         self.n_lines = self.node.get('n_lines', -1)
+        self.fill = self.node.get('color', 0)
 
     def text_gen(self):
         import os
@@ -273,33 +295,41 @@ class TextGroup(Generator):
         size = [int(dim*factors[i]) for i, dim in enumerate(container_size)]
         #spoilers = self.get_spoilers()
         img = Component(str(self), size, self.node)
-        height = random.choice(TextGroup.font_sizes)
-        font_name = random.choice(fonts)
-        font = PIL.ImageFont.truetype(font_name, height)
+
         n_lines = roll_value(self.n_lines)
 
-        w_border = random.randint(5, 15)  # %
-        h_border = random.randint(5, 15)
+        #TODO param these
+        w_border = roll_value(self.node.get('w_border', 0))  # %
+        w_border = int(w_border * size[0])
+        h_border = roll_value(self.node.get('h_border', 0))
+        h_border = int(h_border * size[1])
+        cropped = (size[0] - w_border * 2), (size[1] - h_border * 2)
 
-        cropped = (size[0] - int(size[0] * w_border / 100)), (size[1] - int(size[1] * h_border / 100))
+        font_name = random.choice(fonts)
+        f_size = random.choice(TextGroup.font_sizes)
+        font = PIL.ImageFont.truetype(font_name, f_size)
+        width, l_height = font.getsize('Ag')
+        while l_height + h_border > cropped[1] :
+            f_size -= 1
+            font = PIL.ImageFont.truetype(font_name, f_size)
+            width, l_height = font.getsize('Ag')
 
         draw = ImageDraw.Draw(img)
         y = h_border
-        width, l_height = font.getsize('Ag')
         width = int(cropped[0]//width*2)
 
         text_gen = self.text_gen()
+        fill = roll_value(self.fill)
+        x = w_border
 
-        x = (size[0] - cropped[0]) // 2
-
-        while y + l_height < cropped[1] and n_lines != 0:
+        while y + l_height <= cropped[1] and n_lines != 0:
 
             for line in textwrap.wrap(next(text_gen), width=width):
                 l_height = font.getsize(line)[1]
                 if y + l_height > cropped[1] or n_lines==0:
                     break
                 img.data['data'].append({'text': line, 'box': [x, y, width, l_height]})
-                draw.text((x, y), line, font=font, fill=0)
+                draw.text((x, y), line, font=font, fill=fill)
                 n_lines -= 1
                 y += l_height
         return img
@@ -375,13 +405,14 @@ class Table(Generator):
     def generate(self, container_size=None):
 
         factors = next(self.sizes)
-        size = [ceil(dim * factors[i]) for i, dim in enumerate(container_size)]
-        compose_type = self.node.get('compose_type')
-        img = Component(str(self), size, self.node, background_color=(255,))
+        width, height = [ceil(dim * factors[i]) for i, dim in enumerate(container_size)]
+        compose_type = self.node.get('compose_type', 'plaintable')
+        img = Component(str(self), (width, height), self.node, background_color=(255,))
+        border = self.node.get('border', 0)
+        w_border = h_border = roll_value(border)
 
-        ## PASSARE A TABLE GEN IL TYPE DELLA TABELLA? IN BASE A QUELLO DECIDERE e passare il sottonodo
-        t = Tablegen(size[0],size[1],compose_type,self.node)
-        t.compose(img, (0,0,*size))
+        t = Tablegen(width,height,compose_type,self.node)
+        t.compose(img, (w_border,h_border,width-2*w_border, height-2*h_border))
         img.render()
         return img
 

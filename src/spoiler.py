@@ -102,8 +102,9 @@ class Pad(Filter):
         self.n = n
 
     def run(self, image):
-        logging.debug(f"Running Pad with n:{self.n}")
         n = roll_value(self.n)
+        logging.debug(f"Running Pad with n:{n}")
+
         w, h = image.size
         data = {'type': self.type(), 'n': n}
         self.annotate(image, data)

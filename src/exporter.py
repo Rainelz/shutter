@@ -16,15 +16,16 @@ class LocalExporter(Visitor):
 
         for el, position in component.elements:
             sub_data = self.visit(el)
+            sub_data.update(position=position)
             data['elements'].append(sub_data)
-
+            
         self.depth -= 1
 
         data.update(component.data)
         if self.depth == 0:
 
             assert file_name
-            with open(self.path/f'localexp_{file_name}.json', 'w') as f:
+            with open(self.path/f'{file_name}.json', 'w') as f:
                 json.dump(data, f)
 
         return data

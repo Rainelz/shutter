@@ -30,13 +30,15 @@ class Tablegen():
         self.config = {}
         self.min_width = 50
         self.min_height = 50
-        
-        if self.compose_type == 'plaintable':
-            self.textheads = open(node.get('keys_path'),'r').read().split('\n')
-            self.tabletitles = open(node.get('headers_path'),'r').read().split('\n')
 
-        elif self.compose_type == 'multicell':
-            self.textheads = open(node.get('keys_path'),'r').read().split('\n')
+        keys_file =  node.get('keys_path', None)
+        assert keys_file
+        with open(keys_file, 'r') as f:
+            self.textheads = f.read()
+            self.textheads = self.textheads.split('\n')
+
+        if self.compose_type == 'plaintable':
+            self.tabletitles = open(node.get('headers_path'),'r').read().split('\n')
 
 
         """
