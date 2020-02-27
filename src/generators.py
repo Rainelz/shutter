@@ -337,18 +337,97 @@ class TextGroup(Generator):
 
 class Text(Generator):
     alignments = ['left', 'center', 'right']
+    style_map = {'bold': ' Bold', 'italic': ' Italic'}
+    def __init__(self, opt):
+        super().__init__(opt)
+        self.data_path = self.node.get('source_path', None)
+        self.n_lines = self.node.get('n_lines', -1)
+        self.font = self.node.get('font', dict())
+        self.font_size = self.font.get('size', 'fill')
+        self.fill = self.font.get('fill', 0)
+        self.bold = self.font.get('bold', 0)
+        self.align = self.node.get('align', 'center')
 
-    def __init__(self, size, font=PIL.ImageFont.truetype('Arial', 16), txt='Testo Prova   ', cfg=None):
-        super().__init__(size, dict())
+    def text_gen(self):
+        import os
+        if self.data_path:
+            file_size = os.path.getsize(self.data_path)
+            offset = random.randint(1, file_size)
+            with open(self.data_path, 'r') as file:
+                file.seek(offset)
+                file.readline()
 
-        w_border = random.randint(5,15) #  %
-        h_border = random.randint(5,15)
+                while True:
+                    line = file.readline()
+                    if not line:
+                        file.seek(0, 0)
+                        continue
+                    yield line
+        else:
+            while True:
+                text = self.node.get('text', "Placeholder TEXT")
+                for line in text.split('\n'):
+                    yield line
 
-        cropped = (size[0] - int(size[0] * w_border/100)), (size[1] - int(size[1]*h_border/100))
+    def generate(self,container_size=None):
+        factors = next(self.sizes)
+        size = [int(dim * factors[i]) for i, dim in enumerate(container_size)]
+        # spoilers = self.get_spoilers()
+        img = Component(str(self), size, self.node)
+        
+        #n_lines = roll_value(self.n_lines)
 
-        draw = ImageDraw.Draw(self._img)
+        # TODO param these
+        w_border = roll_value(self.node.get('w_border', 0))  # %
+        w_border = int(w_border * size[0])
+        h_border = roll_value(self.node.get('h_border', 0))
+        h_border = int(h_border * size[1])
+        width, height = cropped = (size[0] - w_border * 2), (size[1] - h_border * 2)
+        
+        draw = ImageDraw.Draw(img)
+        y = h_border
 
-        draw.text(((size[0]-cropped[0])/2, (size[1]-cropped[1])//2),txt, font=font, fill=0, align=random.choice(Text.alignments))
+        text = next(self.text_gen())
+        
+        fonts = ('Courier New',)
+        font_name = random.choice(fonts)
+        font_data = {'name': font_name}
+        for style, value in Text.style_map.items():
+            if roll() < self.font.get(style, 0):
+                font_data.update({style: True})
+                font_name += value
+
+        f_size = roll_value(self.font_size)
+
+        if f_size == 'fill':
+            f_size = height
+
+            while True:
+                font = PIL.ImageFont.truetype(font_name, f_size)
+                c_width, l_height = font.getsize('Ag')
+                c_width = c_width/2
+                max_chars = width // c_width
+
+                lines = textwrap.wrap(text, width=int(max_chars))
+                if l_height + h_border < cropped[1] and len(lines) == 1:
+                    break
+
+                f_size -= 1
+        font_data.update({'size': f_size})
+        fill = roll_value(self.fill)
+        align = roll_value(self.align)
+        x = w_border
+        l_width, l_height = draw.textsize(text, font)
+
+        if align == 'right':
+            x = width-l_width
+        elif align == 'center':
+            x = (width-l_width) // 2
+
+        draw.text((x,y), text, font=font, fill=fill, align=align)
+        img.data['data'].append({'text': text, 'font':font_data, 'box': [x, y, l_width, l_height]})
+
+        return img
 
 
 class Image(Generator):

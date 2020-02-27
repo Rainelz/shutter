@@ -24,10 +24,13 @@ def sample_values():
 generator = sample_values()
 
 def get_value_generator(node):
-    if isinstance(node, (int, float)):
+    if isinstance(node, (int, float, str)):
         while True:
             yield node
     if isinstance(node, list): ## uniform
+        if all(isinstance(val, str) for val in node):
+            while True:
+                yield random.choice(node)
         if all(isinstance(val, int) for val in node):
             while True:
                 yield  random.randint(node[0], node[1]+1)
