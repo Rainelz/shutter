@@ -106,7 +106,7 @@ def get_generators(node):
     return objects
 
 # TODO refactor this
-def get_position_range(component, container_size, last_x, last_y):
+def get_position_range(component, container_size, last_x=0, last_y=0):
     parent_w, parent_h = container_size
     width, height = component.size
     position = component.node.get('position', dict())
@@ -185,11 +185,24 @@ class Generator:
         self.sizes = get_sizes(node)
         self.generators = get_generators(node)
         #assert all(gen.p == 1 for gen in self.generators) or sum(gen.p for gen in self.generators) == 1
-        self.p = node.get('probability', 1)
+        self.p = node.get('p', 1)
         self.components = []
 
     def __str__(self):
         return str(self.__class__.__name__)
+
+    def get_size(self, container_size, last_w, last_h):
+        width, height = next(self.sizes)
+        if width == 'fill':
+            width = (container_size[0] - last_w) / container_size[0]
+        if height == 'fill':
+            height = (container_size[1] - last_h) / container_size[1]
+        if container_size is not None:
+            width *= container_size[0]
+            height *= container_size[1]
+
+        size = int(width), int(height)
+        return size
 
     def get_spoilers(self):
         noises = []
@@ -206,13 +219,9 @@ class Generator:
                 noises.append(noise)
         return noises
 
-    def generate(self, container_size=None):
+    def generate(self, container_size=None, last_w=0, last_h=0):
         """Runs sub-elements generation and computes positions based on the config parameters"""
-        size = next(self.sizes)
-
-        if container_size is not None:
-            size = [int(dim * size[i]) for i, dim in enumerate(container_size)]
-        size = int(size[0]), int(size[1])
+        size = self.get_size(container_size, last_w, last_h)
         logging.info(f"Generating image with size {size}")
 #        spoilers = self.get_spoilers()
         img = Component(str(self), size, self.node)
@@ -226,7 +235,7 @@ class Generator:
 
             if roll() > gen.p:
                 continue
-            component = gen.generate(size)
+            component = gen.generate(size, last_x2, last_y2)
             node = gen.node
             x, y = get_position_range(component, size, last_x2, last_y2)
             x, y = img.check_position_for(x,y,component)
@@ -241,13 +250,11 @@ class Generator:
 
 
 class Container(Generator):
-    def generate(self, container_size=None):
+    def generate(self, container_size=None, last_w=0, last_h=0):
         """Runs sub-elements generation and computes positions based on the config parameters"""
-        size = next(self.sizes)
 
-        if container_size is not None:
-            size = [int(dim * size[i]) for i, dim in enumerate(container_size)]
-        size = int(size[0]), int(size[1])
+        size = self.get_size(container_size, last_w, last_h)
+
         logging.debug(f"Generating container with size {size}")
         img = Component(str(self), size, self.node)
         available_x, available_y = width, height = size
@@ -259,7 +266,7 @@ class Container(Generator):
         chosen = random.choice(self.generators, p=probs)
         im = chosen.generate(size)
         node = chosen.node
-        x, y = get_position_range(size, node)
+        x, y = get_position_range(im, container_size)
         img.add(im, (x, y))
         img.render()
         return img
@@ -296,12 +303,14 @@ class TextGroup(Generator):
                 for line in text.split('\n'):
                     yield line
 
-    def generate(self, container_size=None, dataloader=None, fonts=('Courier',) ):
+    def generate(self, container_size=None, last_w=0, last_h=0):
 
-        factors = next(self.sizes)
-        size = [int(dim*factors[i]) for i, dim in enumerate(container_size)]
+
+        size = self.get_size(container_size, last_w, last_h)
         #spoilers = self.get_spoilers()
         img = Component(str(self), size, self.node)
+
+        fonts = ('Courier',)
 
         n_lines = roll_value(self.n_lines)
 
@@ -376,9 +385,10 @@ class Text(Generator):
                 for line in text.split('\n'):
                     yield line
 
-    def generate(self,container_size=None):
-        factors = next(self.sizes)
-        size = [int(dim * factors[i]) for i, dim in enumerate(container_size)]
+    def generate(self,container_size=None, last_w=0, last_h=0):
+
+        size = self.get_size(container_size, last_w, last_h)
+
         # spoilers = self.get_spoilers()
         img = Component(str(self), size, self.node)
         
@@ -440,7 +450,8 @@ class Text(Generator):
 class Image(Generator):
 #    STAMPS = list(Path('resources/heading_stamps/').glob('*.png'))
 
-    def generate(self, container_size=None):
+    def generate(self, container_size=None, last_w=0, last_h=0):
+
         files_node = self.node.get('files', None)
         if files_node:
             f_path = Path(files_node['path'])
@@ -462,8 +473,7 @@ class Image(Generator):
 
         original = PIL.Image.open(file_path)
 
-        factors = next(self.sizes)
-        size = [int(dim * factors[i]) for i, dim in enumerate(container_size)]
+        size = self.get_size(container_size, last_w, last_h)
         spoilers = self.get_spoilers()
         img = Component(str(self), size, self.node, background_color=(255,255,255,255))
         w_border = random.randint(5,15) #
@@ -488,10 +498,10 @@ class Image(Generator):
 
 # -- To be fixed
 class Table(Generator):
-    def generate(self, container_size=None):
+    def generate(self, container_size=None, last_w=0, last_h=0):
 
         factors = next(self.sizes)
-        width, height = [ceil(dim * factors[i]) for i, dim in enumerate(container_size)]
+        width, height = self.get_size(container_size, last_w, last_h)
         compose_type = self.node.get('compose_type', 'plaintable')
         img = Component(str(self), (width, height), self.node, background_color=(255,))
         border = self.node.get('border', 0)
