@@ -86,14 +86,14 @@ class Component(BaseComponent):
 
         return x, y
 
-def get_components(node):
+def get_generators(node):
     elements = node.get('elements', None) # iterate over yaml nodes
     if elements is None:
         return []
     # create dict class name - constructor
     local_classes = inspect.getmembers(sys.modules[__name__], inspect.isclass)
     local_classes = {name: cls for name, cls in local_classes
-                     if name not in ['BaseComponent', 'ABC'] and not inspect.isabstract(cls)}
+                     if name not in ['Component','BaseComponent'] and not inspect.isabstract(cls)}
     objects = []
     for el in elements:
         class_name = list(el.keys())[0]
@@ -106,7 +106,7 @@ def get_components(node):
     return objects
 
 # TODO refactor this
-def get_position_range(component, container_size):
+def get_position_range(component, container_size, last_x, last_y):
     parent_w, parent_h = container_size
     width, height = component.size
     position = component.node.get('position', dict())
@@ -120,6 +120,8 @@ def get_position_range(component, container_size):
             x = (parent_w - width) // 2
         elif x == 'tail':
             x = parent_w - width
+        elif x == 'concatenate':
+            x = last_x
         else:
             raise ValueError(f'Unsupported position value: {x}')
         x /= parent_w  # result in % relative to parent
@@ -131,6 +133,8 @@ def get_position_range(component, container_size):
             y = (parent_h - height) // 2
         elif y == 'tail':
             y = parent_h-height
+        elif y == 'concatenate':
+            y = last_y
         else:
             raise ValueError(f'Unsupported position value: {y}')
         y /= parent_h
@@ -179,7 +183,7 @@ class Generator:
         node = opt[self.__class__.__name__]
         self.node = node
         self.sizes = get_sizes(node)
-        self.generators = get_components(node)
+        self.generators = get_generators(node)
         #assert all(gen.p == 1 for gen in self.generators) or sum(gen.p for gen in self.generators) == 1
         self.p = node.get('probability', 1)
         self.components = []
@@ -215,15 +219,18 @@ class Generator:
         available_x, available_y = width, height = size
         # total_units = 100
         # unit = (height // total_units)
+        last_x2 = last_y2 = 0
 
+# TODO add concatenate position here
         for gen in self.generators:
 
             if roll() > gen.p:
                 continue
             component = gen.generate(size)
             node = gen.node
-            x, y = get_position_range(component, size)
+            x, y = get_position_range(component, size, last_x2, last_y2)
             x, y = img.check_position_for(x,y,component)
+            last_x2, last_y2 = x + component.size[0], y+component.size[1]
 
             # available_x -= x - baseline_x
             # available_y -= y - baseline_y
@@ -257,7 +264,7 @@ class Container(Generator):
         img.render()
         return img
 
-
+# TODO find a way to refactor these
 class TextGroup(Generator):
     font_sizes = [30, 38, 44, 52]
     #font_sizes = [50]
@@ -309,7 +316,7 @@ class TextGroup(Generator):
         f_size = random.choice(TextGroup.font_sizes)
         font = PIL.ImageFont.truetype(font_name, f_size)
         width, l_height = font.getsize('Ag')
-        while l_height + h_border > cropped[1] :
+        while l_height + h_border > cropped[1]:
             f_size -= 1
             font = PIL.ImageFont.truetype(font_name, f_size)
             width, l_height = font.getsize('Ag')
