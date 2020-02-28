@@ -78,8 +78,11 @@ def main():
     if not seed:
         seed = random.randint(0, 2**32-1)
         opt['seed'] = seed
+        opt['n_workers'] = options.workers
     logging.info(f"Starting generation with seed {seed} ")
-    n_workers= options.workers
+    n_workers = opt.get('n_workers', None)
+    n_workers = n_workers or options.workers  # ensure determinism
+
     filler = [None for _ in range(n_workers - (options.size % n_workers))]
     vals = np.concatenate([np.arange(options.size), filler]).reshape(-1, n_workers).transpose()
     vals = [[f'{options.out_name}_{val:04}' for val in values if val is not None] for values in vals]
