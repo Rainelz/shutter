@@ -25,12 +25,8 @@ def parse_options():
     parser.add_argument('--config', required=True, help='path to YAML config file')
     parser.add_argument('--workers', required=False, type = int, help='Number of workers', default=1)
     parser.add_argument('--out-name', required=False, type = str, help='Base name for output files', default='img')
-
-    parser.add_argument('--fonts', required=False, help='path of the list of fonts')
     parser.add_argument('--dir', required=True, help='path of the output directory')
     parser.add_argument('--size', type=int, default=100, help='how many examples to generate')
-    parser.add_argument('--no-filters', type=bool, default=False, help='Don\'t apply filters')
-    parser.add_argument('--no-skew', default=False, help='Don\'t skew images',  action="store_true")
     parser.add_argument('--dpi', type=int, default=70, help='Noisy images dpi')
 
 

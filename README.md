@@ -2,11 +2,11 @@
 
 
 A Python Tool for the generation of images with different layouts and noise combinations.
-This project implements the Composite Pattern (for generating images) + Visitor Pattern (to apply different spoilers -independentely- or to navigate the structure).
+Shutter is basically a metamodel leveraging the [Composite Pattern](https://en.wikipedia.org/wiki/Composite_pattern) for generating images + [Visitor Pattern](https://en.wikipedia.org/wiki/Visitor_pattern) to apply different spoilers -independentely- or to navigate the structure.
 
-The tool loads a YAML configuration file where each component is defined along with the optional noises to apply on the component as well as the probability distributions of various parameters.
+The tool loads a YAML configuration file where the generation model is defined, i.e. each component is defined along with the optional noises to apply on it as well as the probability distributions of various parameters.
 
-run with `python src/shutter.py --config $CONFIG_FILE --size $K --dir $PATH_TO_OUT_DIR --workers N`
+run with `pipenv run python src/shutter.py --config $CONFIG_FILE --size $K --dir $PATH_TO_OUT_DIR --workers N`
 
 Example configurations available - [config.yml](configs/config-2.yml)
 
@@ -16,15 +16,68 @@ See [Container](#container) for mutual exclusion.
 
 ## Generator
 The basic component to play with in shutter. Defines its size (eventually a position relative to a parent) and a list of sub-components.
+### Basic parameters 
+```
+size:
+  height: H
+  widht: W
+position:
+  x: X
+  y: Y
+elements: 
+  - Generators...
+```  
+Each value node can be filled with an absolute value (H = 2000) or a value < 1 denoting its relation to the parent Generator. 
+#### Spatial values 
+```
+position: 
+  x: 0.5
+  y : concatenate
+size:
+  height: fill
+```
+will place the object sized `(1*parent_width, parent_free_height)` top left corner at `(0.5 * parent_width, parent_height - object_height)`
 
+### Define Randomness
+Wheter you'd like to define a random value for a particular field, you can assign a probability distribution function to it and let shutter do the rest.  e.g.
+```
+Generator:
+  size:
+    width: 
+      distribution: normal
+      mu: 1000
+      sigma: 100
+      min: 800
+      max: 1200
+    height: [1000, 1800]
+  elements: ...
+  spoilers: ...
+```
+
+Defines a Component generator which will produce images with:
+
+**width** sampled from a normal distribution with μ = 1000, σ=100 truncated in the interval [800, 1200]
+
+**height** sampled from a uniform distribution in the interval [1000, 1800]
 ## TextGroup
-A block of text. Loads lazily random text from a `source_path` or fixed text taken from the yaml.`
+A block of text. Loads lazily random text from a `source_path` or fixed `text` taken from the yaml.`{h/w}_border` defines an optional % region of the image to be left blank
+
+## Text
+A single line of text. 
+```
+Text:
+  h_border:[0,0.02]
+  font:
+    bold: 0.5
+    name: font_names.txt
+    italic: ~
+    size: fill
+```
+
 
 ## Image
-An image that can be sampled from a set or be constant. if `files` is defined, `path` points to a folder where to find the files and `probabilities` defines a list of entries like `<file, likelihood to be selected>` see example in [config.yml] (configs/config-2.yml)
+An image that can be sampled from a set or be constant. if `files` is defined, `path` points to a folder where to find the files and `probabilities` defines a list of entries like `<file, likelihood to be selected>` see example in [config.yml](configs/config-2.yml)
 
-## Footer
-A pre-defined component for common page footers.
 
 ## Container
 A logical container useful to define mutually exclusive Components. The configuration syntax is almost equal to Generator less than it assumes that for each defined sub-component there is an associated probability of being picked for generation.
@@ -66,27 +119,6 @@ Adds a vertical line
 ### Gradient
 Adds a intensity gradient to the component
 
-# Define Randomness
-Wheter you'd like to define a random value for a particular field, you can assign a probability distribution function to it and let shutter do the rest.  e.g.
-```
-Generator:
-  size:
-    width: 
-      distribution: normal
-      mu: 1000
-      sigma: 100
-      min: 800
-      max: 1200
-    height: [1000, 1800]
-  elements: ...
-  spoilers: ...
-```
-
-Defines a Component generator which will produce images with:
-
-**width** sampled from a normal distribution with μ = 1000, σ=100 truncated in the interval [800, 1200]
-
-**height** sampled from a uniform distribution in the interval [1000, 1800]
 
 # Exporters
 
