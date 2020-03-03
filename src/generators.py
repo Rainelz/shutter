@@ -462,6 +462,7 @@ class Image(Generator):
             paths = list(f_path.glob('*.png'))
             probabilities = files_node.get('probabilities', None)
             if probabilities:
+                paths = [path for path in paths if path.stem in probabilities.keys()]
                 map = [(name, value) for name, value in probabilities.items()]
                 files, probs = list(zip(*map))
                 paths = sorted(paths, key=lambda x: list(files).index(str(x.stem))) # order Paths like zip result to keep coupling with probs

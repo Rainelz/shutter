@@ -108,9 +108,13 @@ class Pad(Filter):
         w, h = image.size
         data = {'type': self.type(), 'n': n}
         self.annotate(image, data)
-        bg = PIL.Image.new(image.mode, (w + 2 * n, h + 2 * n), 0)
-        bg.paste(image, (n, n))
-        return bg
+        draw = PIL.ImageDraw.Draw(image)
+        draw.rectangle((0,0,w,h), width=n)
+
+
+        # bg = PIL.Image.new(image.mode, (w + 2 * n, h + 2 * n), 0)
+        # bg.paste(image, (n, n))
+        return image
 
 
 class Rotate(Filter):
@@ -145,10 +149,10 @@ class Rotate(Filter):
 
 
 
-def _white_noise(width, height, gray_p):
+def _white_noise(width, height, gray_p, grid_ratio=2):
     """Create downscaled noise grid """
-    w = width // 8
-    h = height // 8
+    w = width // grid_ratio
+    h = height // grid_ratio
     # w = width
     # h = height
     pil_map = PIL.Image.new("L", (w, h), 255)
@@ -161,16 +165,19 @@ def _white_noise(width, height, gray_p):
 class Background(Filter):
     """Create noise grid and apply to background"""
     DEFAULT_GREY=[220,255]
+    DEF_GRID_RATIO=2
 
-    def __init__(self, grey=DEFAULT_GREY, **kwargs):
+    def __init__(self, grey=DEFAULT_GREY, grid_ratio=DEF_GRID_RATIO,**kwargs):
         super().__init__(**kwargs)
         self.grey = grey
+        self.grid_ratio=grid_ratio
 
     def run(self, image):
         logging.debug(f"Running Background with grey {self.grey}")
 
         w, h = image.size
-        noise = _white_noise(w, h, self.grey)
+        grid_ratio = roll_value(self.grid_ratio)
+        noise = _white_noise(w, h, self.grey, grid_ratio)
         data = {'type': self.type(), 'grey': self.grey}
         self.annotate(image, data)
         return PIL.ImageChops.darker(image, noise)
@@ -181,16 +188,19 @@ class Background(Filter):
 class Foreground(Filter):
     """Create noise grid and apply to foreground"""
     DEFAULT_GREY=[0,200]
+    DEF_GRID_RATIO=2
 
-    def __init__(self, grey=DEFAULT_GREY, **kwargs):
+    def __init__(self, grey=DEFAULT_GREY, grid_ratio=DEF_GRID_RATIO, **kwargs):
         super().__init__(**kwargs)
         self.grey = grey
+        self.grid_ratio = grid_ratio
 
     def run(self, image):
         logging.debug(f"Running Foreground with grey {self.grey}")
 
         w, h = image.size
-        noise = _white_noise(w, h, self.grey)
+        grid_ratio = roll_value(self.grid_ratio)
+        noise = _white_noise(w, h, self.grey, grid_ratio=grid_ratio)
         data = {'type': self.type(), 'grey': self.grey}
         self.annotate(image, data)
         return PIL.ImageChops.lighter(image, noise)
@@ -211,19 +221,22 @@ class Blur(Filter):
         return image.filter(PIL.ImageFilter.GaussianBlur(r))
 
 class SaltPepper(Filter):
-    DEF_DENSITY=50
+    DEF_RATIO=0.5
+    DEF_AMOUNT=0.05
 
-    def __init__(self, density=DEF_DENSITY, **kwargs):
-        super().__init__(*kwargs)
-        self.density = density
+    def __init__(self, ratio=DEF_RATIO, amount=DEF_AMOUNT, **kwargs):
+        super().__init__(**kwargs)
+        self.ratio = ratio
+        self.amount = amount
 
     def run(self, image):
-        density = roll_value(self.density)
+        ratio = roll_value(self.ratio)
+        amount = roll_value(self.amount)
         w,h = image.size
         w = w//4
         h = h//4
-        s_vs_p = 1
-        amount = 0.4
+        s_vs_p = ratio
+
         out = np.copy(np.array(image))
         # Salt mode
         num_salt = np.ceil(amount * w*h * s_vs_p)
@@ -231,7 +244,7 @@ class SaltPepper(Filter):
                   for i in image.size]
         coords = tuple((coords[1], coords[0]))
         #coords = [coord[1], coord[0] for coord in coords]
-        out[coords] = 1
+        out[coords] = 255
 
         # Pepper mode
         num_pepper = np.ceil(amount * w*h * (1. - s_vs_p))
@@ -240,7 +253,8 @@ class SaltPepper(Filter):
         coords = tuple((coords[1], coords[0]))
 
         out[coords] = 0
-        return PIL.ImageChops.darker(image, PIL.Image.fromarray(out).resize(image.size, PIL.Image.LINEAR))
+        intermediate = PIL.ImageChops.lighter(image, PIL.Image.fromarray(out).resize(image.size, PIL.Image.CUBIC) )
+        return PIL.ImageChops.darker(intermediate, PIL.Image.fromarray(out).resize(image.size, PIL.Image.CUBIC))
 
 
 class Stroke(Filter):
