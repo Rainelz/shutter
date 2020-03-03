@@ -6,9 +6,15 @@ Shutter is basically a metamodel leveraging the [Composite Pattern](https://en.w
 
 The tool loads a YAML configuration file where the generation model is defined, i.e. each component is defined along with the optional noises to apply on it as well as the probability distributions of various parameters.
 
-run with `pipenv run python src/shutter.py --config $CONFIG_FILE --size $K --dir $PATH_TO_OUT_DIR --workers N`
+It exports by default the ground truth images, the spoiled images, and a yaml containing the parameters used for the generation (including the seed used to initialize the random state to enable determinism between run).
+In addition to that, the tool runs the exporters defined into the yaml file. see [Exporters](#exporters)
 
-Example configurations available - [config.yml](configs/config-2.yml)
+
+run with `pipenv run python src/shutter.py --config $CONFIG_FILE --size $K --dir $PATH_TO_OUT_DIR [--workers N] [--out FILE_PREFIX]`
+
+Example configurations available in [examples](examples)
+
+Output examples using [paper.yml](examples/paper.yml) available in [examples/paper_out](examples/paper_out)
 
 # Available Components
 Each component has a default generation probability of 1. Overriding the default behaviour results in optional components.
@@ -76,7 +82,7 @@ Text:
 
 
 ## Image
-An image that can be sampled from a set or be constant. if `files` is defined, `path` points to a folder where to find the files and `probabilities` defines a list of entries like `<file, likelihood to be selected>` see example in [config.yml](configs/config-2.yml)
+An image that can be sampled from a set or be constant. if `files` is defined, `path` points to a folder where to find the files and `probabilities` defines a list of entries like `<file, likelihood to be selected>` see example in [config.yml](examples/paper.yml)
 
 
 ## Container
@@ -122,8 +128,12 @@ Adds a intensity gradient to the component
 
 # Exporters
 
-Currently only a local JSON exporter is implemented. This means that each coordinate is exported with respect to its frame origin.
+Currently only a local JSON exporter and a coupler (GT/spoiled) are implemented. 
+## LocalExporter
+Local exporter means that each coordinate is exported with respect to its frame origin.
 The Local exporter dumps generation and spoilers informations such as type of component, size, applied spoilers, rolled values (when available) and data contained.
+
+
 More to come...
 
 # Create custom Component

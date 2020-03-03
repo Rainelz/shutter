@@ -275,12 +275,18 @@ class Container(Generator):
 class TextGroup(Generator):
     font_sizes = [30, 38, 44, 52]
     #font_sizes = [50]
+    style_map = {'bold': ' Bold', 'italic': ' Italic'}
 
+    DEF_F_NAME = 'Courier'
     def __init__(self, opt):
         super().__init__(opt)
         self.data_path = self.node.get('source_path', None)
         self.n_lines = self.node.get('n_lines', -1)
-        self.fill = self.node.get('color', 0)
+        self.font = self.node.get('font', dict())
+        self.f_name = self.node.get('name', self.DEF_F_NAME)
+        self.font_size = self.font.get('size', 24)
+        self.fill = self.font.get('fill', 0)
+        self.bold = self.font.get('bold', 0)
 
     def text_gen(self):
         import os
@@ -310,19 +316,16 @@ class TextGroup(Generator):
         #spoilers = self.get_spoilers()
         img = Component(str(self), size, self.node)
 
-        fonts = ('Courier',)
-
         n_lines = roll_value(self.n_lines)
 
-        #TODO param these
         w_border = roll_value(self.node.get('w_border', 0))  # %
         w_border = int(w_border * size[0])
         h_border = roll_value(self.node.get('h_border', 0))
         h_border = int(h_border * size[1])
         cropped = (size[0] - w_border * 2), (size[1] - h_border * 2)
 
-        font_name = random.choice(fonts)
-        f_size = random.choice(TextGroup.font_sizes)
+        font_name = roll_value(self.f_name)
+        f_size = roll_value(self.font_size)
         font = PIL.ImageFont.truetype(font_name, f_size)
         width, l_height = font.getsize('Ag')
         while l_height + h_border > cropped[1]:

@@ -6,7 +6,7 @@ import yaml
 
 from generators import Generator
 from spoiler import Spoiler
-from exporter import LocalExporter
+from exporter import from_options
 
 
 
@@ -65,10 +65,10 @@ def main():
             exit(1)
     gt_dir = f"{options.dir}/original"
     data_dir = f"{options.dir}/spoiled"
-    ann_dir = f"{options.dir}/annotations"
+    export_dir = f"{options.dir}/export"
     os.makedirs(data_dir, exist_ok=True)
     os.makedirs(gt_dir, exist_ok=True)
-    os.makedirs(ann_dir, exist_ok=True)
+    os.makedirs(export_dir, exist_ok=True)
 
     seed = opt.get('seed', None)
     if not seed:
@@ -88,8 +88,11 @@ def main():
 
     for i in range(n_workers):
         seed = random.randint(0,2**32-1)
-        visitors = [Spoiler(), LocalExporter(path=ann_dir)]
-        p = Process(target=gen_image_pool, args=(Generator(opt), visitors, vals[i], options, seed))
+        generator = Generator(opt)
+        spoiler = Spoiler()
+        exporters = from_options(opt, export_dir)
+        visitors = [spoiler] + exporters
+        p = Process(target=gen_image_pool, args=(generator, visitors, vals[i], options, seed))
         p.start()
         processes.append(p)
     for p in processes:
