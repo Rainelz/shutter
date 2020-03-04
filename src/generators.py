@@ -239,7 +239,8 @@ class Generator:
             node = gen.node
             x, y = get_position_range(component, size, last_x2, last_y2)
             x, y = img.check_position_for(x,y,component)
-            last_x2, last_y2 = x + component.size[0], y+component.size[1]
+            last_x2, last_y2 = max(x + component.size[0], last_x2),\
+                               max(y+component.size[1], last_y2)
 
             # available_x -= x - baseline_x
             # available_y -= y - baseline_y
@@ -292,7 +293,7 @@ class TextGroup(Generator):
         import os
         if self.data_path:
             file_size = os.path.getsize(self.data_path)
-            offset = random.randint(1, file_size)
+            offset = roll_value([1, file_size])
             with open(self.data_path, 'r') as file:
                 file.seek(offset)
                 file.readline()
@@ -366,7 +367,7 @@ class Text(Generator):
         self.fill = self.font.get('fill', 0)
         self.bold = self.font.get('bold', 0)
         self.align = self.node.get('align', 'center')
-
+        self.v_align = self.node.get('v_align', 'top')
     def text_gen(self):
         import os
         if self.data_path:
@@ -429,15 +430,20 @@ class Text(Generator):
                 max_chars = width // c_width
 
                 lines = textwrap.wrap(text, width=int(max_chars))
-                if l_height + h_border < cropped[1] and len(lines) == 1:
+                if l_height + h_border < cropped[1] and len(lines) == 1 or f_size < 1:
                     break
 
                 f_size -= 1
         font_data.update({'size': f_size})
         fill = roll_value(self.fill)
         align = roll_value(self.align)
+        v_align = roll_value(self.v_align)
         x = w_border
         l_width, l_height = draw.textsize(text, font)
+        if v_align == 'bottom':
+            y = height-l_height
+        elif v_align == 'center':
+            y = (height-l_height) // 2
 
         if align == 'right':
             x = width-l_width
@@ -504,14 +510,16 @@ class Image(Generator):
 class Table(Generator):
     def generate(self, container_size=None, last_w=0, last_h=0):
 
-        factors = next(self.sizes)
         width, height = self.get_size(container_size, last_w, last_h)
         compose_type = self.node.get('compose_type', 'plaintable')
-        img = Component(str(self), (width, height), self.node, background_color=(255,))
-        border = self.node.get('border', 0)
-        w_border = h_border = roll_value(border)
-
+        img = Component(str(self), (width, height), self.node,background_color=(255,))
+        border = self.node.get('w_border', 0)
+        w_border = roll_value(self.node.get('w_border', 0))  # %
+        w_border = int(w_border * width)
+        h_border = roll_value(self.node.get('h_border', 0))
+        h_border = int(h_border * height)
         t = Tablegen(width,height,compose_type,self.node)
+
         t.compose(img, (w_border,h_border,width-2*w_border, height-2*h_border))
         img.render()
         return img

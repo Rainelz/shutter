@@ -50,6 +50,7 @@ def gen_image(image_generator, visitors, options, i):
 
 def gen_image_pool(generator, visitors, pool_list, opt, seed):
     random.seed(seed)
+    logging.debug(f"Initializing thread with seed : {seed}")
     for item in pool_list:
         gen_image(generator, visitors, opt, item)
 

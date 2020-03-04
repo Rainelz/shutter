@@ -320,7 +320,7 @@ class Tablegen():
 
         if roll() < 0.5 and lev >= 2: # equiprobable vertical and horizontal splits
             # split vertically
-            xcoord = random.randint(0,rect[2])
+            #xcoord = random.randint(0,rect[2])
             xcoord = abs(int(np.random.normal(rect[2]//2,20)))
             rect_left = (rect[0], rect[1], xcoord, rect[3]) 
             im = self.make_multicell(im,rect_left,lev+1, max_lev) # left
@@ -329,7 +329,7 @@ class Tablegen():
             im = self.make_multicell(im,rect_right,lev+1, max_lev) # right
         else:
             # split horizontally
-            ycoord = random.randint(0,rect[3])
+            #ycoord = random.randint(0,rect[3])
             ycoord = abs(int(np.random.normal(rect[3]//2,20)))
             rect_up = (rect[0], rect[1], rect[2], ycoord)  
             im = self.make_multicell(im,rect_up,lev+1, max_lev) # left
@@ -397,8 +397,8 @@ class Tablegen():
         min_rows = 3
         min_cols = 2
         # at least 20px tall rows and 100px wide cols to improve readability (additional min-max check for the feasibility w.r.t. the page size)
-        max_rows = rect[3]//50
-        max_cols = rect[2]//200
+        max_rows = int(rect[3]//50)
+        max_cols = int(rect[2]//200)
         n_rows = max(min(max_rows,int(roll_value(self.node.get('rows')))),min_rows)
         n_cols = max(min(max_cols,int(roll_value(self.node.get('cols')))),min_cols)
         return n_rows, n_cols

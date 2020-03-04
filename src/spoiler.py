@@ -260,7 +260,7 @@ class SaltPepper(Filter):
 class Stroke(Filter):
     """Draw random stroke"""
     def __init__(self, num_signs=None, num_strokes=None, step=None, **kwargs):
-        super().__init__(*kwargs)
+        super().__init__(**kwargs)
         self.num_signs = num_signs or random.randint(1, 6)
         self.num_strokes = num_strokes or random.randint(3, 14)
         self.step = step or random.randint(10, 50)
