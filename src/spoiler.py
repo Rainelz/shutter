@@ -4,6 +4,7 @@ from pathlib import Path
 import math
 import inspect
 import logging
+from io import BytesIO
 
 import numpy as np
 import numpy.random as random
@@ -427,6 +428,25 @@ class Gradient(Filter):
         black_im.putalpha(alpha)
         gradient_im = PIL.Image.alpha_composite(image, black_im)
         return gradient_im
+
+class JPEGCompression(Filter):
+    """Apply a gradient foregound noise"""
+
+    def __init__(self, quality=50, subsampling=-1, **kwargs):
+        super().__init__(**kwargs)
+        self.quality = quality
+        self.subsampling = subsampling
+
+    def run(self, image):
+        quality = roll_value(self.quality)
+        subsampling = roll_value(self.subsampling)
+        logging.debug(f"Running JPEGCompression with quality: {quality} and subsampling {subsampling}")
+        compressed = BytesIO()
+        image.save(compressed, "JPEG", quality=quality, subsampling=subsampling)
+        compressed.seek(0)
+        compr = PIL.Image.open(compressed)
+        image._img=compr
+        return image
     #
     # @staticmethod
     # def random():
