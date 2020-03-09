@@ -326,6 +326,7 @@ class TextGroup(Generator):
         cropped = (size[0] - w_border * 2), (size[1] - h_border * 2)
 
         font_name = roll_value(self.f_name)
+        font_name = font_name.replace(' ', '_')
         f_size = roll_value(self.font_size)
         font = PIL.ImageFont.truetype(font_name, f_size)
         width, l_height = font.getsize('Ag')
