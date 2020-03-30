@@ -7,18 +7,19 @@ import yaml
 from generators import Generator
 from spoiler import Spoiler
 from exporter import from_options
+from progress_bar import ProgressBar
 
 
-
-def config_logger():
+def config_logger(out_dir):
     logger = logging.getLogger()
     logging.getLogger('PIL').setLevel(logging.ERROR)
     logger.setLevel(logging.DEBUG)
     formatter = logging.Formatter('%(asctime)s %(levelname)s - [%(process)s] %(message)s')
     stdout_handler = logging.StreamHandler(sys.stdout)
-    stdout_handler.setFormatter(formatter)
-    stdout_handler.setLevel(logging.DEBUG)
-    logger.addHandler(stdout_handler)
+    file_handler = logging.FileHandler(f'{out_dir}/shutter.log')
+    file_handler.setFormatter(formatter)
+    file_handler.setLevel(logging.DEBUG)
+    logger.addHandler(file_handler)
 
 def parse_options():
     parser = argparse.ArgumentParser(description='Generated text and images.')
@@ -48,16 +49,16 @@ def gen_image(image_generator, visitors, options, i):
 
     image.save(img_file, dpi=(options.dpi, options.dpi))
 
-def gen_image_pool(generator, visitors, pool_list, opt, seed):
+def gen_image_pool(generator, visitors, pool_list, opt, seed, update_pbar):
     random.seed(seed)
     logging.debug(f"Initializing thread with seed : {seed}")
     for item in pool_list:
         gen_image(generator, visitors, opt, item)
-
+        update_pbar(item)
 def main():
     import numpy as np
     options = parse_options()
-    config_logger()
+    config_logger(options.dir)
     with open(options.config, 'r') as stream:
         try:
             opt = yaml.safe_load(stream)
@@ -86,14 +87,16 @@ def main():
     processes = []
 
     random.seed(seed)
-
+    pbar = ProgressBar(options.size)
+    def update_pbar(item):
+        pbar.update(f"Generated {item}")
     for i in range(n_workers):
         seed = random.randint(0,2**32-1)
         generator = Generator(opt)
         spoiler = Spoiler()
         exporters = from_options(opt, export_dir)
         visitors = [spoiler] + exporters
-        p = Process(target=gen_image_pool, args=(generator, visitors, vals[i], options, seed))
+        p = Process(target=gen_image_pool, args=(generator, visitors, vals[i], options, seed, update_pbar))
         p.start()
         processes.append(p)
     for p in processes:
