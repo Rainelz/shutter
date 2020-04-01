@@ -10,6 +10,8 @@ import numpy as np
 import numpy.random as random
 import PIL, PIL.ImageFont, PIL.Image, PIL.ImageDraw, PIL.ImageChops, PIL.ImageOps, PIL.ImageFilter
 
+import cv2
+
 from dice_roller import roll, roll_value, get_value_generator
 from interfaces import Visitor
 from generators import Component
@@ -445,7 +447,30 @@ class JPEGCompression(Filter):
         image.save(compressed, "JPEG", quality=quality, subsampling=subsampling)
         compressed.seek(0)
         compr = PIL.Image.open(compressed)
-        image._img=compr
+        image._img = compr
+        return image
+
+class TextSpoiler(Filter):
+    """Dilate text and replace with grey"""
+
+    def __init__(self, grey=127, dilate_k=3, **kwargs):
+        super().__init__(**kwargs)
+        self.grey = grey
+        self.dilate_k = dilate_k
+
+    def run(self, image):
+        grey = roll_value(self.grey)
+        dilate_k = roll_value(self.dilate_k)
+        logging.debug(f"Running TextSpoilere with grey: {grey} and kernel {dilate_k}")
+        cv_im = np.array(image._img)
+        # kernel = np.zeros((dilate_k, dilate_k), np.uint8)
+        # kernel[5,:] = 1
+        # kernel[:,3] = 1
+        kernel = cv2.getStructuringElement(cv2.MORPH_CROSS, (dilate_k, dilate_k))
+        dilated = cv2.morphologyEx(cv_im, cv2.MORPH_ERODE, kernel)
+        dilated[dilated != 255] = grey
+        pil_im = PIL.Image.fromarray(dilated)
+        image._img = pil_im
         return image
     #
     # @staticmethod
