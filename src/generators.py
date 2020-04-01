@@ -113,6 +113,9 @@ def get_position_range(component, container_size, last_x=0, last_y=0):
     x = position.get('x', 0)
     y = position.get('y', 0)
 
+    if isinstance(x, list):
+        if all(isinstance(val, str) for val in x):
+            x = random.choice(x)
     if isinstance(x, str):
         if x == 'head':
             x = 0
@@ -125,7 +128,9 @@ def get_position_range(component, container_size, last_x=0, last_y=0):
         else:
             raise ValueError(f'Unsupported position value: {x}')
         x /= parent_w  # result in % relative to parent
-
+    if isinstance(y, list):
+        if all(isinstance(val, str) for val in y):
+            y = random.choice(y)
     if isinstance(y, str):
         if y == 'head':
             y = 0
@@ -278,13 +283,13 @@ class TextGroup(Generator):
     #font_sizes = [50]
     style_map = {'bold': ' Bold', 'italic': ' Italic'}
 
-    DEF_F_NAME = 'Courier'
+    DEF_F_NAME = 'Courier New'
     def __init__(self, opt):
         super().__init__(opt)
         self.data_path = self.node.get('source_path', None)
         self.n_lines = self.node.get('n_lines', -1)
         self.font = self.node.get('font', dict())
-        self.f_name = self.node.get('name', self.DEF_F_NAME)
+        self.f_name = self.font.get('name', self.DEF_F_NAME)
         self.font_size = self.font.get('size', 24)
         self.fill = self.font.get('fill', 0)
         self.bold = self.font.get('bold', 0)
@@ -333,7 +338,7 @@ class TextGroup(Generator):
         while l_height + h_border > cropped[1]:
             f_size -= 1
             font = PIL.ImageFont.truetype(font_name, f_size)
-            width, l_height = font.getsize('Ag')
+            width, l_height = font.getsize('A g')
 
         draw = ImageDraw.Draw(img)
         y = h_border
@@ -359,11 +364,15 @@ class TextGroup(Generator):
 class Text(Generator):
     alignments = ['left', 'center', 'right']
     style_map = {'bold': ' Bold', 'italic': ' Italic'}
+    DEF_F_NAME = 'Arial'
+
     def __init__(self, opt):
         super().__init__(opt)
         self.data_path = self.node.get('source_path', None)
         self.n_lines = self.node.get('n_lines', -1)
         self.font = self.node.get('font', dict())
+        self.f_name = self.font.get('name', self.DEF_F_NAME)
+
         self.font_size = self.font.get('size', 'fill')
         self.fill = self.font.get('fill', 0)
         self.bold = self.font.get('bold', 0)
@@ -411,14 +420,14 @@ class Text(Generator):
 
         text = next(self.text_gen())
         
-        fonts = ('Courier New',)
-        font_name = random.choice(fonts)
+        font_name = roll_value(self.f_name)
+
         font_data = {'name': font_name}
         for style, value in Text.style_map.items():
             if roll() < self.font.get(style, 0):
                 font_data.update({style: True})
                 font_name += value
-
+        font_name = font_name.replace(' ', '_')
         f_size = roll_value(self.font_size)
 
         if f_size == 'fill':

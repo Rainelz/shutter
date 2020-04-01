@@ -63,6 +63,7 @@ def main():
         try:
             opt = yaml.safe_load(stream)
         except yaml.YAMLError as exc:
+            print(exc)
             logging.exception(exc)
             exit(1)
     gt_dir = f"{options.dir}/original"

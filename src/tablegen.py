@@ -121,7 +121,7 @@ class Tablegen():
         go_len = True
         while go_len and cnt < 10000:      
             if roll() < 0.6:
-                out = str(random.randint(23,499))+','+ '{:0>2d}'.format(random.randint(0,99))
+                out = str(random.randint(23,9999))+','+ '{:0>2d}'.format(random.randint(0,99))
             else:
                 lent = int(abs(np.random.normal(4,5)))
                 out = ''.join(random.choice(string.ascii_letters) for x in range(lent))       
@@ -129,6 +129,7 @@ class Tablegen():
             go_len = font.getsize(out)[0] > rect[2]
         if cnt >= 10000:
             out = '00'
+
         return out
 
     def put_text(self, im, rect, mode = 'multiple', maxnum = 3):
@@ -145,7 +146,7 @@ class Tablegen():
         font_keytop = ImageFont.truetype(fontname_keytop, self.base_font )
         line_height = font.getsize('hg')[1]
         line_height_keytop = font_keytop.getsize('hg')[1]
-        font_large = ImageFont.truetype(fontname, int(self.base_font*1.15))#int(fsize*1.5) )
+        font_large = ImageFont.truetype(fontname, int(self.base_font*1.8))#int(fsize*1.5) )
         line_height_large = font_large.getsize('hg')[1]
         font_tcell = ImageFont.truetype(fontname, self.min_font+self.pad_font_min_size)
         line_height_tcell = font_tcell.getsize('hg')[1]
@@ -166,6 +167,8 @@ class Tablegen():
                     draw.text((rect[0]+5, rect[1]+z*rect[3]//maxnum),num,0,font=font)
             else:
                 top_text = self.textheads[random.randint(0,len(self.textheads)-1)]
+                if roll() <= self.node.get('uppercase_key', 0):
+                    top_text = top_text.upper()
                 num = self.gen_celltext(font_large,rect)
 
                 toplen = font_keytop.getsize(top_text)[0]
@@ -200,6 +203,8 @@ class Tablegen():
                     num_rows = math.floor(rect[3]/(line_height_keytop*1.4))
                     for z in range(0,num_rows):
                         top_text = self.textheads[random.randint(0,len(self.textheads)-1)]
+                        if roll() <= self.node.get('uppercase_key', 0):
+                            top_text = top_text.upper()
                         num = self.gen_celltext(font_large,[rect[0],rect[1],rect[2]//3,rect[3]])
 
                         xposleft = rect[0]+int(rect[2]*0.01)
