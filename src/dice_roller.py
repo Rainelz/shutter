@@ -1,7 +1,7 @@
 import numpy.random as random
 from scipy.stats import truncnorm
 
-SAMPLES = 3000
+SAMPLES = 200
 
 def truncated_normal(mean=0, sd=1, low=0, upp=10, samples=SAMPLES):
     a, b = (low - mean) / sd, (upp - mean) / sd
