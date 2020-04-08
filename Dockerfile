@@ -49,7 +49,7 @@ ENV PATH="${PYENV_ROOT}/shims:${PYENV_ROOT}/bin:$PATH"
 ENV PIPENV_VENV_IN_PROJECT=true
 RUN DEBIAN_FRONTEND=noninteractive apt-get update && apt-get -y install git build-essential zlib1g-dev \
         libffi-dev libssl-dev libbz2-dev libreadline-dev libsm6 curl libsqlite3-dev "libglib2.0-0" libxrender1
-RUN git clone --branch v1.2.13 git://github.com/yyuu/pyenv.git ${PYENV_ROOT} && \
+RUN git clone --branch v1.2.13 https://github.com/yyuu/pyenv.git ${PYENV_ROOT} && \
     pyenv install "$PY_VERSION" && \
     pyenv global ${PY_VERSION} && \
     pip install --upgrade pip && \
