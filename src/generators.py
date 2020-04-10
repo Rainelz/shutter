@@ -7,6 +7,7 @@ from math import ceil
 from collections import defaultdict
 import PIL.Image
 from PIL import ImageDraw
+from itertools import product
 
 import numpy as np
 import numpy.random as random
@@ -14,7 +15,7 @@ import textwrap
 
 from interfaces import BaseComponent
 from dice_roller import roll, roll_value, fn_map, SAMPLES, get_value_generator
-from tablegen import TableGen
+#from tablegen import TableGen
 #from tablegen import Table
 
 
@@ -182,7 +183,7 @@ def get_sizes(node):
 
 MIN = 0
 MAX = 1
-
+DEF_F_NAME = 'Arial'
 DEFAULT_NOISE_P = 0.5
 class Generator:
     """
@@ -288,13 +289,12 @@ class TextGroup(Generator):
     #font_sizes = [50]
     style_map = {'bold': ' Bold', 'italic': ' Italic'}
 
-    DEF_F_NAME = 'Courier New'
     def __init__(self, opt):
         super().__init__(opt)
         self.data_path = self.node.get('source_path', None)
         self.n_lines = self.node.get('n_lines', -1)
         self.font = self.node.get('font', dict())
-        self.f_name = self.font.get('name', self.DEF_F_NAME)
+        self.f_name = self.font.get('name', DEF_F_NAME)
         self.font_size = self.font.get('size', 24)
         self.fill = self.font.get('fill', 0)
         self.bold = self.font.get('bold', 0)
@@ -382,14 +382,13 @@ class TextGroup(Generator):
 class Text(Generator):
     alignments = ['left', 'center', 'right']
     style_map = {'bold': ' Bold', 'italic': ' Italic'}
-    DEF_F_NAME = 'Arial'
 
     def __init__(self, opt):
         super().__init__(opt)
         self.data_path = self.node.get('source_path', None)
         self.n_lines = self.node.get('n_lines', -1)
         self.font = self.node.get('font', dict())
-        self.f_name = self.font.get('name', self.DEF_F_NAME)
+        self.f_name = self.font.get('name', DEF_F_NAME)
 
         self.font_size = self.font.get('size', 'fill')
         self.fill = self.font.get('fill', 0)
@@ -417,7 +416,7 @@ class Text(Generator):
                 for line in text.split('\n'):
                     yield line
 
-    def generate(self,container_size=None, last_w=0, last_h=0):
+    def generate(self, container_size=None, last_w=0, last_h=0):
 
         size = self.get_size(container_size, last_w, last_h)
 
@@ -545,19 +544,8 @@ class Image(Generator):
         return img
 
 
-class Table(Generator):
-    def generate(self, container_size=None, last_w=0, last_h=0):
-
-        width, height = self.get_size(container_size, last_w, last_h)
-        img = Component(str(self), (width, height), self.node, background_color=(255,255,255))
-        table = TableGen(width, height, self.node)
-        img = table.compose(img)
-        img.render()
-        return img
-
-
 class TableCell(Generator):
-    DEF_F_NAME = 'Arial'
+
     def __init__(self, opt):
         super().__init__(opt)
         self.values_file = self.node.get('values_file', None)
@@ -566,7 +554,7 @@ class TableCell(Generator):
         self.h_border = self.node.get('h_border', 0)
 
         self.font = self.node.get('font', dict())
-        self.f_name = self.font.get('name', self.DEF_F_NAME)
+        self.f_name = self.font.get('name', DEF_F_NAME)
         self.font_size = self.font.get('size', 'fill')
         self.fill = self.font.get('fill', 0)
         self.bold = self.font.get('bold', 0)
@@ -612,7 +600,7 @@ class TableCell(Generator):
         w_border = int(w_border * size[0])
         h_border = roll_value(self.h_border)
         h_border = int(h_border * size[1])
-        width, height  = (size[0] - w_border * 2), (size[1] - h_border * 2)
+        width, height = (size[0] - w_border * 2), (size[1] - h_border * 2)
 
         # Creating text generator with calculated size, default alignment and my font info
         value_node = {'Text': {'size': {'width': width, 'height': height},
@@ -624,24 +612,6 @@ class TableCell(Generator):
         cell.add(value, (w_border, h_border))
         cell.render()
         return cell
-        # text_out = []
-        # t = ''
-        # for word in self.text.split(' '):
-        #     if font.getsize(t)[0] <= self.width * 0.7:
-        #         t = t + word + ' '
-        #     else:
-        #         text_out.append(t.strip())
-        #         t = ''
-        #
-        # text_out.append(t)
-        # MAX_W, MAX_H = img.size
-        # h_text = 0
-        # for phrase in text_out:
-        #     w = ((MAX_W - self.border_width - font.getsize(phrase)[0])/MAX_W) / 2
-        #     h = ((MAX_H - self.border_width - font.getsize(phrase)[1] * len(text_out))/MAX_H) / 2
-        #     draw.text((MAX_W * w ,(h * MAX_H) + h_text), phrase, 0, font=font, align="center")
-        #     h_text = h_text + font.getsize(phrase)[1]
-        # return img
 
     def generate(self, container_size=None, last_w=0, last_h=0):
         size = self.get_size(container_size, last_w, last_h)
@@ -652,8 +622,70 @@ class TableCell(Generator):
         self.add_frame(cell, 2)
 
         return cell
-        # if self.text is not None:
-        #     img._img = self.add_plain_text(img._img)
-        # return img
+
+
+class Table(Generator):
+
+    def __init__(self, opt):
+        super().__init__(opt)
+        self.cols = self.node.get('cols', 1)
+        self.rows = self.node.get('rows', 1)
+
+        self.font = self.node.get('font', dict())
+        self.f_name = self.font.get('name', DEF_F_NAME)
+        self.font_size = self.font.get('size', 'fill')
+        self.fill = self.font.get('fill', 0)
+        self.bold = self.font.get('bold', 0)
+        self.align = self.node.get('align', 'center')
+        self.v_align = self.node.get('v_align', 'top')
+        self.values_file = self.node.get('values_file', None)
+        self.keys_file = self.node.get('keys_file', None)
+
+    def generate(self, container_size=None, last_w=0, last_h=0):
+        size = self.get_size(container_size, last_w, last_h)
+
+        table = Component(str(self), size, self.node)
+        n_rows = roll_value(self.rows)
+        n_cols = roll_value(self.cols)
+
+        schema, cell_h, cell_w = self.make_table_schema(table, n_rows, n_cols)
+        cells = self.gen_cells(schema, cell_h, cell_w)
+        self.make_table(table, cells)
+
+        return table
+
+    def gen_cells(self, schema, cell_h, cell_w):
+
+        for cell in schema:
+            cell_node = {'TableCell': {'size': {'width': cell_w, 'height': cell_h},
+                                       'font': self.font,
+                                       'values_file': self.values_file
+                                       }
+                         }
+            cell_gen = TableCell(cell_node)
+            cell_im = cell_gen.generate()
+
+            schema[cell] = cell_im
+        return schema
+
+    @staticmethod
+    def make_table_schema(table, n_rows, n_cols):
+        pos_mapping = dict()
+        width, height = table.size
+        cell_h = height // n_rows
+        cell_w = width // n_cols
+        couples = product([x for x in range(n_cols)], [y for y in range(n_rows)])
+        for couple in couples:
+            coord = (couple[0] * cell_w, couple[1] * cell_h)
+            pos_mapping[coord] = None
+        return pos_mapping, cell_h, cell_w
+
+    @staticmethod
+    def make_table(table, cells):
+        for cell_pos in cells:
+            table.add(cells[cell_pos], cell_pos)
+        table.render()
+
+
 
 
