@@ -24,19 +24,33 @@ def sample_values():
 generator = sample_values()
 
 def get_value_generator(node):
+    """Returns a value generator from the provided distribution.
+    If node is a scalar, return the scalar
+    if node is a list of strings, samples from the list
+    if node is a list of numbers uniformly samples in the interval
+    if nodes is a list of lists of len 2 defining values and probabilities of being picked, sample from that dist
+    if node is a dict defining a distribution, samples from the distribution (if supported)
+    """
     if isinstance(node, (int, float, str)):
         while True:
             yield node
-    if isinstance(node, list): ## uniform
-        if all(isinstance(val, str) for val in node):
+    if isinstance(node, list):
+        if all(isinstance(val, (list, tuple)) and len(val) == 2 for val in node):  # list of lists [value, p]
+            values, probs = list(zip(*node))
+            while True:
+                yield random.choice(values, p=probs)
+
+        elif all(isinstance(val, str) for val in node):  # uniform
             while True:
                 yield random.choice(node)
-        if all(isinstance(val, int) for val in node):
+        elif all(isinstance(val, int) for val in node) and len(node) == 2:
             while True:
-                yield  random.randint(node[0], node[1]+1)
-        else:
+                yield random.randint(node[0], node[1]+1)
+        elif len(node) == 2:
             while True:
                 yield random.uniform(*node)
+        else:
+            raise ValueError(f"Unrecognized Value distribution for list {node}")
     elif isinstance(node, dict):
 
         distribution = node.get('distribution', 'normal')

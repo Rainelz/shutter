@@ -17,10 +17,6 @@ from dice_roller import roll, roll_value, fn_map, SAMPLES, get_value_generator
 from tablegen import Tablegen
 
 
-    #
-    # def should_visit_leaves(self):
-    #     return False
-
 
 class Component(BaseComponent):
     """
@@ -212,20 +208,20 @@ class Generator:
         size = int(width), int(height)
         return size
 
-    def get_spoilers(self):
-        noises = []
-        for noise in self.node.get('spoilers', list()):
-            if isinstance(noise, str):
-                p = DEFAULT_NOISE_P
-            else:
-                noisenode = list(noise.items())[0][1]
-                noisename = list(noise.items())[0][0]
-
-                p = noisenode.get('p', DEFAULT_NOISE_P)
-                noise = noisename
-            if roll() <= p:
-                noises.append(noise)
-        return noises
+    # def get_spoilers(self):
+    #     noises = []
+    #     for noise in self.node.get('spoilers', list()):
+    #         if isinstance(noise, str):
+    #             p = DEFAULT_NOISE_P
+    #         else:
+    #             noisenode = list(noise.items())[0][1]
+    #             noisename = list(noise.items())[0][0]
+    #
+    #             p = noisenode.get('p', DEFAULT_NOISE_P)
+    #             noise = noisename
+    #         if roll() <= p:
+    #             noises.append(noise)
+    #     return noises
 
     def generate(self, container_size=None, last_w=0, last_h=0):
         """Runs sub-elements generation and computes positions based on the config parameters"""
@@ -238,7 +234,7 @@ class Generator:
         # unit = (height // total_units)
         last_x2 = last_y2 = 0
 
-# TODO add concatenate position here
+        # TODO add concatenate position here
         for gen in self.generators:
 
             if roll() > gen.p:
@@ -272,7 +268,7 @@ class Container(Generator):
         probs = [gen.p for gen in self.generators]
         if sum(probs) != 1:
             probs = None # undefined p, using uniform
-        chosen = random.choice(self.generators, p=probs)
+        chosen = roll_value(list(zip(self.generators, probs)))
         im = chosen.generate(size)
         node = chosen.node
         x, y = get_position_range(im, container_size)
@@ -306,7 +302,7 @@ class TextGroup(Generator):
                 file.seek(offset)
                 file.readline()
 
-                while True:
+                while True:  # lazily read speeding up big files
                     line = file.readline()
                     if not line:
                         file.seek(0, 0)
@@ -515,7 +511,6 @@ class Image(Generator):
         original = PIL.Image.open(file_path)
 
         size = self.get_size(container_size, last_w, last_h)
-        spoilers = self.get_spoilers()
         img = Component(str(self), size, self.node, background_color=(255,255,255,255))
         w_border = random.randint(5,15) #
         h_border = random.randint(5,15)
