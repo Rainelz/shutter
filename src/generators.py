@@ -14,7 +14,8 @@ import textwrap
 
 from interfaces import BaseComponent
 from dice_roller import roll, roll_value, fn_map, SAMPLES, get_value_generator
-from tablegen import Tablegen
+from tablegen import TableGen
+#from tablegen import Table
 
 
     #
@@ -535,30 +536,16 @@ class Image(Generator):
         img.paste(resized, position)
         return img
 
-#########--------------------
 
-# -- To be fixed
 class Table(Generator):
     def generate(self, container_size=None, last_w=0, last_h=0):
 
         width, height = self.get_size(container_size, last_w, last_h)
-        compose_type = self.node.get('compose_type', 'plaintable')
-        img = Component(str(self), (width, height), self.node,background_color=(255,))
-        border = self.node.get('w_border', 0)
-        w_border = roll_value(self.node.get('w_border', 0))  # %
-        w_border = int(w_border * width)
-        h_border = roll_value(self.node.get('h_border', 0))
-        h_border = int(h_border * height)
-        t = Tablegen(width,height,compose_type,self.node)
-
-        t.compose(img, (w_border,h_border,width-2*w_border, height-2*h_border))
+        img = Component(str(self), (width, height), self.node, background_color=(255,255,255))
+        table = TableGen(width, height, self.node)
+        img = table.compose(img)
         img.render()
         return img
-
-# -- To be completed
-class Tablecells(Generator):
-    def generate(self, container_size=None):
-        return None
 
 
 
