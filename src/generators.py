@@ -86,6 +86,9 @@ class Component(BaseComponent):
 
         return x, y
 
+    def annotate(self, data):
+        self.data['data'].append(data)
+
 def get_generators(node):
     elements = node.get('elements', None) # iterate over yaml nodes
     if elements is None:
@@ -331,21 +334,34 @@ class TextGroup(Generator):
         cropped = (size[0] - w_border * 2), (size[1] - h_border * 2)
 
         font_name = roll_value(self.f_name)
+        font_data = {'name': font_name}
+
+        for style, value in TextGroup.style_map.items():
+            if roll() < self.font.get(style, 0):
+                font_data.update({style: True})
+                font_name += value
+
         font_name = font_name.replace(' ', '_')
         f_size = roll_value(self.font_size)
-        font = PIL.ImageFont.truetype(font_name, f_size)
+        try:
+            font = PIL.ImageFont.truetype(font_name, f_size)
+        except OSError:
+            logging.exception(f"Cannot open font {font_name} with size {f_size}")
+            exit(1)
         width, l_height = font.getsize('Ag')
         while l_height + h_border > cropped[1]:
             f_size -= 1
             font = PIL.ImageFont.truetype(font_name, f_size)
             width, l_height = font.getsize('A g')
 
+        font_data.update({'size': f_size})
         draw = ImageDraw.Draw(img)
         y = h_border
         width = int(cropped[0]//width*2)
 
         text_gen = self.text_gen()
         fill = roll_value(self.fill)
+        font_data.update({'fill': fill})
         x = w_border
 
         while y + l_height <= cropped[1] and n_lines != 0:
@@ -354,7 +370,7 @@ class TextGroup(Generator):
                 l_height = font.getsize(line)[1]
                 if y + l_height > cropped[1] or n_lines==0:
                     break
-                img.data['data'].append({'text': line, 'box': [x, y, width, l_height]})
+                img.annotate({'text': line, 'font': font_data, 'box': [x, y, width, l_height]})
                 draw.text((x, y), line, font=font, fill=fill)
                 n_lines -= 1
                 y += l_height
@@ -434,7 +450,11 @@ class Text(Generator):
             f_size = height
 
             while True:
-                font = PIL.ImageFont.truetype(font_name, f_size)
+                try:
+                    font = PIL.ImageFont.truetype(font_name, f_size)
+                except OSError:
+                    logging.exception(f"Cannot open font {font_name} with size {f_size}")
+                    exit(1)
                 c_width, l_height = font.getsize('Ag')
                 c_width = c_width/2
                 max_chars = width // c_width
@@ -446,6 +466,7 @@ class Text(Generator):
                 f_size -= 1
         font_data.update({'size': f_size})
         fill = roll_value(self.fill)
+        font_data.update({'fill': fill})
         align = roll_value(self.align)
         v_align = roll_value(self.v_align)
         x = w_border
@@ -461,7 +482,7 @@ class Text(Generator):
             x = (width-l_width) // 2
 
         draw.text((x,y), text, font=font, fill=fill, align=align)
-        img.data['data'].append({'text': text, 'font':font_data, 'box': [x, y, l_width, l_height]})
+        img.annotate({'text': text, 'font': font_data, 'box': [x, y, l_width, l_height]})
 
         return img
 
@@ -510,7 +531,7 @@ class Image(Generator):
         rand_left = random.randint(0, w_border + cropped[0]-resized.size[0])
         rand_top = random.randint(0, h_border + cropped[1]-resized.size[1])
         position = rand_left, rand_top
-
+        img.annotate({'image': str(file_path), 'box': [*position, *new_size]})
         img.paste(resized, position)
         return img
 

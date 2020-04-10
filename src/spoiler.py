@@ -463,9 +463,7 @@ class TextSpoiler(Filter):
         dilate_k = roll_value(self.dilate_k)
         logging.debug(f"Running TextSpoilere with grey: {grey} and kernel {dilate_k}")
         cv_im = np.array(image._img)
-        # kernel = np.zeros((dilate_k, dilate_k), np.uint8)
-        # kernel[5,:] = 1
-        # kernel[:,3] = 1
+
         kernel = cv2.getStructuringElement(cv2.MORPH_CROSS, (dilate_k, dilate_k))
         dilated = cv2.morphologyEx(cv_im, cv2.MORPH_ERODE, kernel)
         dilated[dilated != 255] = grey

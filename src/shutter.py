@@ -16,10 +16,13 @@ def config_logger(out_dir):
     logger.setLevel(logging.DEBUG)
     formatter = logging.Formatter('%(asctime)s %(levelname)s - [%(process)s] %(message)s')
     stdout_handler = logging.StreamHandler(sys.stdout)
+    stdout_handler.setFormatter(formatter)
+    stdout_handler.setLevel(logging.ERROR)
     file_handler = logging.FileHandler(f'{out_dir}/shutter.log')
     file_handler.setFormatter(formatter)
     file_handler.setLevel(logging.DEBUG)
     logger.addHandler(file_handler)
+    logger.addHandler(stdout_handler)
 
 def parse_options():
     parser = argparse.ArgumentParser(description='Generated text and images.')

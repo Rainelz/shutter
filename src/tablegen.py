@@ -141,7 +141,9 @@ class Tablegen():
             fontname = fontname + ' Bold'
         else:
             fontname_keytop = fontname
-        
+        fontname = fontname.replace(' ', '_')
+        fontname_keytop = fontname_keytop.replace(' ', '_')
+
         font = ImageFont.truetype(fontname, self.base_font )
         font_keytop = ImageFont.truetype(fontname_keytop, self.base_font )
         line_height = font.getsize('hg')[1]
