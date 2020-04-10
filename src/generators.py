@@ -206,8 +206,9 @@ class Generator:
             width = (container_size[0] - last_w) / container_size[0]
         if height == 'fill':
             height = (container_size[1] - last_h) / container_size[1]
-        if container_size is not None:
+        if container_size is not None and width <=1:
             width *= container_size[0]
+        if container_size is not None and height <= 1:
             height *= container_size[1]
 
         size = int(width), int(height)
@@ -394,7 +395,7 @@ class Text(Generator):
         self.fill = self.font.get('fill', 0)
         self.bold = self.font.get('bold', 0)
         self.align = self.node.get('align', 'center')
-        self.v_align = self.node.get('v_align', 'top')
+        self.v_align = self.node.get('v_align', 'center')
     def text_gen(self):
         import os
         if self.data_path:
@@ -465,13 +466,20 @@ class Text(Generator):
                     break
 
                 f_size -= 1
+        try:
+            font = PIL.ImageFont.truetype(font_name, f_size)
+        except OSError:
+            logging.exception(f"Cannot open font {font_name} with size {f_size}")
+            exit(1)
+
+        _, l_height = font.getsize('Ag')
         font_data.update({'size': f_size})
         fill = roll_value(self.fill)
         font_data.update({'fill': fill})
         align = roll_value(self.align)
         v_align = roll_value(self.v_align)
         x = w_border
-        l_width, l_height = draw.textsize(text, font)
+        l_width, _ = draw.textsize(text, font)
         if v_align == 'bottom':
             y = height-l_height
         elif v_align == 'center':
@@ -548,6 +556,104 @@ class Table(Generator):
         return img
 
 
+class TableCell(Generator):
+    DEF_F_NAME = 'Arial'
+    def __init__(self, opt):
+        super().__init__(opt)
+        self.values_file = self.node.get('values_file', None)
 
+        self.w_border = self.node.get('w_border', 0)
+        self.h_border = self.node.get('h_border', 0)
+
+        self.font = self.node.get('font', dict())
+        self.f_name = self.font.get('name', self.DEF_F_NAME)
+        self.font_size = self.font.get('size', 'fill')
+        self.fill = self.font.get('fill', 0)
+        self.bold = self.font.get('bold', 0)
+        self.align = self.node.get('align', 'center')
+        self.v_align = self.node.get('v_align', 'top')
+
+    def text_gen(self):
+        import os
+        if self.values_file:
+            file_size = os.path.getsize(self.values_file)
+            offset = random.randint(1, file_size)
+            with open(self.values_file, 'r') as file:
+                file.seek(offset)
+                file.readline()
+
+                while True:
+                    line = file.readline()
+                    if not line:
+                        file.seek(0, 0)
+                        continue
+                    yield line
+        else:
+            while True:
+                text = self.node.get('value', "123456")
+                for line in text.split('\n'):
+                    yield line
+
+    @staticmethod
+    def add_frame(img, b_size, b_color = 0):
+        border_w = PIL.Image.new("L", (img.width, b_size), b_color)
+        border_h = PIL.Image.new("L", (b_size, img.height), b_color)
+        img.paste(border_w, (0, 0))
+        img.paste(border_w, (0, img.height - b_size))
+        img.paste(border_h, (0, 0))
+        img.paste(border_h, (img.width - b_size, 0))
+        #return img
+
+    def write_value(self, cell):
+
+        size = cell.size
+        # -- white border
+        w_border = roll_value(self.w_border)  # in %
+        w_border = int(w_border * size[0])
+        h_border = roll_value(self.h_border)
+        h_border = int(h_border * size[1])
+        width, height  = (size[0] - w_border * 2), (size[1] - h_border * 2)
+
+        # Creating text generator with calculated size, default alignment and my font info
+        value_node = {'Text': {'size': {'width': width, 'height': height},
+                               'source_path': self.values_file, 'n_lines': 1,
+                               'font': self.font}}
+
+        value_gen = Text(value_node)
+        value = value_gen.generate(container_size=size)
+        cell.add(value, (w_border, h_border))
+        cell.render()
+        return cell
+        # text_out = []
+        # t = ''
+        # for word in self.text.split(' '):
+        #     if font.getsize(t)[0] <= self.width * 0.7:
+        #         t = t + word + ' '
+        #     else:
+        #         text_out.append(t.strip())
+        #         t = ''
+        #
+        # text_out.append(t)
+        # MAX_W, MAX_H = img.size
+        # h_text = 0
+        # for phrase in text_out:
+        #     w = ((MAX_W - self.border_width - font.getsize(phrase)[0])/MAX_W) / 2
+        #     h = ((MAX_H - self.border_width - font.getsize(phrase)[1] * len(text_out))/MAX_H) / 2
+        #     draw.text((MAX_W * w ,(h * MAX_H) + h_text), phrase, 0, font=font, align="center")
+        #     h_text = h_text + font.getsize(phrase)[1]
+        # return img
+
+    def generate(self, container_size=None, last_w=0, last_h=0):
+        size = self.get_size(container_size, last_w, last_h)
+
+        cell = Component(str(self), size, self.node)
+
+        cell = self.write_value(cell)
+        self.add_frame(cell, 2)
+
+        return cell
+        # if self.text is not None:
+        #     img._img = self.add_plain_text(img._img)
+        # return img
 
 
