@@ -630,6 +630,10 @@ class Table(Generator):
         super().__init__(opt)
         self.cols = self.node.get('cols', 1)
         self.rows = self.node.get('rows', 1)
+        self.cell_size = self.node.get('cell_size', dict())
+        self.cell_w = self.cell_size.get('width', 1)
+        self.cell_h = self.cell_size.get('height', 1)
+        self.fix_rows = self.node.get('fix_rows', 0.5)
 
         self.font = self.node.get('font', dict())
         self.f_name = self.font.get('name', DEF_F_NAME)
@@ -644,19 +648,20 @@ class Table(Generator):
     def generate(self, container_size=None, last_w=0, last_h=0):
         size = self.get_size(container_size, last_w, last_h)
 
-        table = Component(str(self), size, self.node)
+        table = Component(str(self), size, self.node, background_color=(0,0,255))
         n_rows = roll_value(self.rows)
         n_cols = roll_value(self.cols)
 
-        schema, cell_h, cell_w = self.make_table_schema(table, n_rows, n_cols)
-        cells = self.gen_cells(schema, cell_h, cell_w)
+        schema = self.make_table_schema(table, n_rows, n_cols)
+        cells = self.gen_cells(schema)
         self.make_table(table, cells)
 
         return table
 
-    def gen_cells(self, schema, cell_h, cell_w):
+    def gen_cells(self, schema):
 
-        for cell in schema:
+        for coord in schema:
+            _, (cell_w, cell_h) = schema[coord]
             cell_node = {'TableCell': {'size': {'width': cell_w, 'height': cell_h},
                                        'font': self.font,
                                        'values_file': self.values_file
@@ -665,25 +670,57 @@ class Table(Generator):
             cell_gen = TableCell(cell_node)
             cell_im = cell_gen.generate()
 
-            schema[cell] = cell_im
+            schema[coord] = cell_im, (cell_w, cell_h)
         return schema
 
-    @staticmethod
-    def make_table_schema(table, n_rows, n_cols):
+    def make_table_fixed(self, table, axis):
+        n_cols = 3
         pos_mapping = dict()
+
         width, height = table.size
-        cell_h = height // n_rows
-        cell_w = width // n_cols
-        couples = product([x for x in range(n_cols)], [y for y in range(n_rows)])
+        mu = width / n_cols
+        n_rows = roll_value(self.rows)
+        cell_h = height// n_rows
+        rem_w = width
+        min = width * 0.2
+        max = width
+        ws = []
+        for i in range(n_cols):
+            cell_w = int(roll_value({'distribution': 'normal', 'mu':mu, 'sigma': 100, 'min':min, 'max':max}))
+            rem_w -= cell_w
+            mu = rem_w / n_cols - (i+1)
+            max = rem_w
+            min = rem_w * 0.5
+            ws.append(cell_w)
+        couples = list(product([x for x in range(n_cols)], [y for y in range(n_rows)]))
         for couple in couples:
-            coord = (couple[0] * cell_w, couple[1] * cell_h)
-            pos_mapping[coord] = None
-        return pos_mapping, cell_h, cell_w
+            cur_col = couple[0]
+            coord = (sum(ws[:cur_col]), int(couple[1] * cell_h))
+            pos_mapping[coord] = (None, (ws[cur_col], cell_h))
+        return pos_mapping
+
+
+
+    def make_table_schema(self, table, n_rows, n_cols):
+
+        pos_mapping = dict()
+        if roll() <= self.fix_rows:
+            return self.make_table_fixed(table, axis=0)
+        else:
+
+            width, height = table.size
+            cell_h = height // n_rows
+            cell_w = width // n_cols
+            couples = product([x for x in range(n_cols)], [y for y in range(n_rows)])
+            for couple in couples:
+                coord = (couple[0] * cell_w, couple[1] * cell_h)
+                pos_mapping[coord] = None,
+            return pos_mapping, cell_h, cell_w
 
     @staticmethod
     def make_table(table, cells):
         for cell_pos in cells:
-            table.add(cells[cell_pos], cell_pos)
+            table.add(cells[cell_pos][0], cell_pos)
         table.render()
 
 
