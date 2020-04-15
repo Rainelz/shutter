@@ -634,6 +634,7 @@ class Table(Generator):
         self.cell_w = self.cell_size.get('width', 1)
         self.cell_h = self.cell_size.get('height', 1)
         self.fix_rows = self.node.get('fix_rows', 0.5)
+        self.plain_table = self.node.get('plain_table', True)
 
         self.font = self.node.get('font', dict())
         self.f_name = self.font.get('name', DEF_F_NAME)
@@ -648,7 +649,7 @@ class Table(Generator):
     def generate(self, container_size=None, last_w=0, last_h=0):
         size = self.get_size(container_size, last_w, last_h)
 
-        table = Component(str(self), size, self.node, background_color=(0,0,255))
+        table = Component(str(self), size, self.node, background_color=(255,255,255))
         n_rows = roll_value(self.rows)
         n_cols = roll_value(self.cols)
 
@@ -674,48 +675,80 @@ class Table(Generator):
         return schema
 
     def make_table_fixed(self, table, axis):
-        n_cols = 3
+
+        def calculate_parameters(axis, width, height, n_cols, n_rows):
+            if axis == 0:
+                measure = width
+                mu = width / n_cols
+                fix_size = height // n_rows
+
+            else:
+                measure = height
+                mu = height / n_rows
+                fix_size = width // n_cols
+
+            rem = measure
+            min = mu * (0.5)
+            max_ = mu * (1.5)
+            return(rem, fix_size, mu, min, max_)
+
+        def calculate_sizes(n, rem, mu, sigma, min, max_):
+            sizes = []
+            max_space = rem
+            for i in range(n):
+                if i == n-1:
+                    size = max_space - sum(sizes)
+                    sizes.append(size)
+                    continue
+                size = int(roll_value({'distribution': 'normal', 'mu': mu, 'sigma': sigma, 'min': min, 'max': max_}))
+                rem -= size
+                if n - (i + 1) > 0:
+                    mu = rem / (n - (i + 1))
+                max_ = int(mu * 1.5)
+                min = int(mu * 0.5)
+                sizes.append(size)
+            return sizes
+
         pos_mapping = dict()
 
         width, height = table.size
-        mu = width / n_cols
+        n_cols = roll_value(self.cols)
         n_rows = roll_value(self.rows)
-        cell_h = height// n_rows
-        rem_w = width
-        min = width * 0.2
-        max = width
-        ws = []
-        for i in range(n_cols):
-            cell_w = int(roll_value({'distribution': 'normal', 'mu':mu, 'sigma': 100, 'min':min, 'max':max}))
-            rem_w -= cell_w
-            mu = rem_w / n_cols - (i+1)
-            max = rem_w
-            min = rem_w * 0.5
-            ws.append(cell_w)
+        rem, fix_size, mu, min, max_ = calculate_parameters(axis, width, height, n_cols, n_rows)
+        sigma = mu * 0.3
+        if axis == 0:
+            sizes = calculate_sizes(n_cols, rem, mu, sigma, min, max_)
+        else:
+            sizes = calculate_sizes(n_rows, rem, mu, sigma, min, max_)
         couples = list(product([x for x in range(n_cols)], [y for y in range(n_rows)]))
-        for couple in couples:
-            cur_col = couple[0]
-            coord = (sum(ws[:cur_col]), int(couple[1] * cell_h))
-            pos_mapping[coord] = (None, (ws[cur_col], cell_h))
+        if axis == 0:
+            for couple in couples:
+                cur_col = couple[0]
+                coord = (sum(sizes[:cur_col]), int(couple[1] * fix_size))
+                pos_mapping[coord] = (None, (sizes[cur_col], fix_size))
+        else:
+            for couple in couples:
+                cur_row = couple[1]
+                coord = (int(couple[0] * fix_size), sum(sizes[:cur_row]))
+                pos_mapping[coord] = (None, (fix_size, sizes[cur_row]))
         return pos_mapping
 
-
-
     def make_table_schema(self, table, n_rows, n_cols):
-
         pos_mapping = dict()
-        if roll() <= self.fix_rows:
-            return self.make_table_fixed(table, axis=0)
-        else:
-
+        if self.plain_table:
             width, height = table.size
             cell_h = height // n_rows
             cell_w = width // n_cols
             couples = product([x for x in range(n_cols)], [y for y in range(n_rows)])
             for couple in couples:
                 coord = (couple[0] * cell_w, couple[1] * cell_h)
-                pos_mapping[coord] = None,
-            return pos_mapping, cell_h, cell_w
+                pos_mapping[coord] = (None, (cell_w, cell_h))
+            return pos_mapping
+        else:
+            axis = 1
+            if roll() <= self.fix_rows:
+                axis = 0
+            return self.make_table_fixed(table, axis = axis)
 
     @staticmethod
     def make_table(table, cells):
