@@ -33,7 +33,7 @@ def get_value_generator(node):
                 yield random.choice(node)
         if all(isinstance(val, int) for val in node):
             while True:
-                yield  random.randint(node[0], node[1]+1)
+                yield random.randint(node[0], node[1]+1)
         else:
             while True:
                 yield random.uniform(*node)

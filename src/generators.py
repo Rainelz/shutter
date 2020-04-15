@@ -676,61 +676,81 @@ class Table(Generator):
 
     def make_table_fixed(self, table, axis):
 
-        def calculate_parameters(axis, width, height, n_cols, n_rows):
-            if axis == 0:
-                measure = width
-                mu = width / n_cols
-                fix_size = height // n_rows
+        def roll_cells(table, n_rows, n_cols, axis):
+            # N.B. axis is the axis to use for varying values e.g. 0 -> varying widths
+            # trying to keep the values couples to enable swap based on axis
+            dims = table.size
+            grid = n_cols, n_rows
+            opposite_axis = abs(axis-1)
 
-            else:
-                measure = height
-                mu = height / n_rows
-                fix_size = width // n_cols
+            measure = dims[axis]  # width
+            mu = measure / grid[axis]  # width / n_cols
 
-            rem = measure
-            min = mu * (0.5)
-            max_ = mu * (1.5)
-            return(rem, fix_size, mu, min, max_)
+            fixed_side = dims[opposite_axis] // grid[opposite_axis]  # height // n_rows
 
-        def calculate_sizes(n, rem, mu, sigma, min, max_):
+            rem = measure  # width
+            min = mu * 0.5
+            max_ = mu * 1.5
+            sigma = mu * 0.3
             sizes = []
-            max_space = rem
-            for i in range(n):
-                if i == n-1:
-                    size = max_space - sum(sizes)
-                    sizes.append(size)
-                    continue
-                size = int(roll_value({'distribution': 'normal', 'mu': mu, 'sigma': sigma, 'min': min, 'max': max_}))
-                rem -= size
-                if n - (i + 1) > 0:
-                    mu = rem / (n - (i + 1))
+            n_cells = grid[axis]  # per row/col
+
+            #  create 1 row/col sizes, calculating varying width/height, permute if axis == 1
+            for i in range(n_cells-1):
+
+                var_side = int(roll_value({'distribution': 'normal', 'mu': mu, 'sigma': sigma, 'min': min, 'max': max_}))
+                rem -= var_side
+
+                mu = rem / (n_cells - (i + 1))
                 max_ = int(mu * 1.5)
                 min = int(mu * 0.5)
+
+                size = var_side, fixed_side
+                if axis == 1:  # transpose if rolling heights
+                    size = size[1], size[0]
                 sizes.append(size)
-            return sizes
+
+            # === last cell
+            size = rem, fixed_side  # fill with last cell
+            if axis == 1:
+                size = size[1], size[0]
+            sizes.append(size)
+            # ===
+
+            values = list(zip(*sizes))[axis]  # get rolled values on axis
+
+            #  iterate on other dim and calc positions for each cell
+            table_cells = []
+            for i in range(grid[opposite_axis]):
+                var_pos = [sum(values[:j]) for j in range(n_cells)]  # cumulative positions
+                fix_pos = [fixed_side*i for _ in range(n_cells)]  # fixed side positions
+                pos = var_pos, fix_pos
+                # couple positions (var & fixed), eventually swap based on axis
+                pos = list(zip(pos[axis], pos[opposite_axis]))
+
+                group = []
+                for pos, size in zip(pos,sizes): # for each (row/col) create entry (position, size)
+                    cell = (pos, size)
+                    group.append(cell)
+
+                table_cells.append(group)
+
+            # this block permutes the matrix to have values ordered by row
+            # if axis == 1:
+            #     table_cells = np.array(table_cells).reshape((n_cols, n_rows, 2, 1))
+            #     table_cells = np.swapaxes(table_cells, 0, 1).tolist()
+
+            return table_cells
 
         pos_mapping = dict()
 
-        width, height = table.size
         n_cols = roll_value(self.cols)
         n_rows = roll_value(self.rows)
-        rem, fix_size, mu, min, max_ = calculate_parameters(axis, width, height, n_cols, n_rows)
-        sigma = mu * 0.3
-        if axis == 0:
-            sizes = calculate_sizes(n_cols, rem, mu, sigma, min, max_)
-        else:
-            sizes = calculate_sizes(n_rows, rem, mu, sigma, min, max_)
-        couples = list(product([x for x in range(n_cols)], [y for y in range(n_rows)]))
-        if axis == 0:
-            for couple in couples:
-                cur_col = couple[0]
-                coord = (sum(sizes[:cur_col]), int(couple[1] * fix_size))
-                pos_mapping[coord] = (None, (sizes[cur_col], fix_size))
-        else:
-            for couple in couples:
-                cur_row = couple[1]
-                coord = (int(couple[0] * fix_size), sum(sizes[:cur_row]))
-                pos_mapping[coord] = (None, (fix_size, sizes[cur_row]))
+        cells = roll_cells(table, n_cols, n_rows, axis)
+        for row in cells:
+            for pos, size in row:
+                pos_mapping[pos] = (None, size)
+
         return pos_mapping
 
     def make_table_schema(self, table, n_rows, n_cols):
@@ -745,10 +765,9 @@ class Table(Generator):
                 pos_mapping[coord] = (None, (cell_w, cell_h))
             return pos_mapping
         else:
-            axis = 1
-            if roll() <= self.fix_rows:
-                axis = 0
-            return self.make_table_fixed(table, axis = axis)
+            axis = roll_value([0, 1])
+
+            return self.make_table_fixed(table, axis=axis)
 
     @staticmethod
     def make_table(table, cells):
