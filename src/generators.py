@@ -636,6 +636,7 @@ class TableCell(Generator):
 
         value_gen = Text(value_node)
         value = value_gen.generate(container_size=size)
+        value.annotate({'value':True, 'key':False})
         cell.add(value, (l_border, t_border))
         cell.render()
         return cell
@@ -645,7 +646,7 @@ class TableCell(Generator):
 
         cell = Component(str(self), size, self.node)
         frame = self.add_frame(cell)
-
+        cell.annotate({'frame': frame})
         cell = self.write_value(cell, frame)
 
         return cell
