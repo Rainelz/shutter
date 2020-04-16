@@ -416,6 +416,61 @@ class Text(Generator):
                 for line in text.split('\n'):
                     yield line
 
+    def get_font(self, text, size):
+        width, height = size
+        font_name = roll_value(self.f_name)
+
+        font_data = {'name': font_name}
+        for style, value in Text.style_map.items():
+            if roll() < self.font.get(style, 0):
+                font_data.update({style: True})
+                font_name += value
+        font_name = font_name.replace(' ', '_')
+        f_size = roll_value(self.font_size)
+        if isinstance(f_size, int):  # check if it fits
+            try:
+                font = PIL.ImageFont.truetype(font_name, f_size)
+            except OSError:
+                logging.exception(f"Cannot open font {font_name} with size {f_size}")
+                exit(1)
+            l_width, l_height = font.getsize(text)
+            c_width = l_width / len(text)
+            max_chars = width // c_width
+
+            lines = textwrap.wrap(text, width=int(max_chars))
+            if l_height > height or l_width > width or f_size < 1:  # doesn't fit, go for filling. N.B. single line!
+                f_size = 'fill'  #
+
+        if f_size == 'fill':
+            font_data.update({'filled':True})
+            f_size = int(height * 0.8)
+
+            while True:
+                try:
+                    font = PIL.ImageFont.truetype(font_name, f_size)
+                except OSError:
+                    logging.exception(f"Cannot open font {font_name} with size {f_size}")
+                    exit(1)
+                c_width, l_height = font.getsize('Ag')
+                c_width = c_width / 2
+                max_chars = width // c_width
+                if max_chars > 0:
+                    #print(f"f_size {f_size}, max_ch {max_chars}")
+                    lines = textwrap.wrap(text, width=int(max_chars))
+                    if l_height < height and len(lines) == 1 or f_size < 1:
+                        break
+
+                f_size -= 1
+        try:
+            font = PIL.ImageFont.truetype(font_name, f_size)
+        except OSError:
+            logging.exception(f"Cannot open font {font_name} with size {f_size}")
+            exit(1)
+        font_data.update({'size': f_size})
+
+
+        return font, font_data
+
     def generate(self, container_size=None, last_w=0, last_h=0):
 
         size = self.get_size(container_size, last_w, last_h)
@@ -436,45 +491,14 @@ class Text(Generator):
         y = h_border
 
         text = next(self.text_gen())
-        
-        font_name = roll_value(self.f_name)
 
-        font_data = {'name': font_name}
-        for style, value in Text.style_map.items():
-            if roll() < self.font.get(style, 0):
-                font_data.update({style: True})
-                font_name += value
-        font_name = font_name.replace(' ', '_')
-        f_size = roll_value(self.font_size)
+        font, font_data = self.get_font(text, cropped)
 
-        if f_size == 'fill':
-            f_size = height
-
-            while True:
-                try:
-                    font = PIL.ImageFont.truetype(font_name, f_size)
-                except OSError:
-                    logging.exception(f"Cannot open font {font_name} with size {f_size}")
-                    exit(1)
-                c_width, l_height = font.getsize('Ag')
-                c_width = c_width/2
-                max_chars = width // c_width
-
-                lines = textwrap.wrap(text, width=int(max_chars))
-                if l_height + h_border < cropped[1] and len(lines) == 1 or f_size < 1:
-                    break
-
-                f_size -= 1
-        try:
-            font = PIL.ImageFont.truetype(font_name, f_size)
-        except OSError:
-            logging.exception(f"Cannot open font {font_name} with size {f_size}")
-            exit(1)
-
-        _, l_height = font.getsize('Ag')
-        font_data.update({'size': f_size})
         fill = roll_value(self.fill)
         font_data.update({'fill': fill})
+
+        _, l_height = font.getsize('Ag')
+
         align = roll_value(self.align)
         v_align = roll_value(self.v_align)
         x = w_border
@@ -552,7 +576,7 @@ class TableCell(Generator):
 
         self.w_border = self.node.get('w_border', 0)
         self.h_border = self.node.get('h_border', 0)
-
+        self.frame = self.node.get('frame', 2)
         self.font = self.node.get('font', dict())
         self.f_name = self.font.get('name', DEF_F_NAME)
         self.font_size = self.font.get('size', 'fill')
@@ -582,25 +606,28 @@ class TableCell(Generator):
                 for line in text.split('\n'):
                     yield line
 
-    @staticmethod
-    def add_frame(img, b_size, b_color = 0):
+    def add_frame(self, img, b_color=0):
+        b_size = roll_value(self.frame)
         border_w = PIL.Image.new("L", (img.width, b_size), b_color)
         border_h = PIL.Image.new("L", (b_size, img.height), b_color)
         img.paste(border_w, (0, 0))
         img.paste(border_w, (0, img.height - b_size))
         img.paste(border_h, (0, 0))
         img.paste(border_h, (img.width - b_size, 0))
+        return b_size, b_size, b_size, b_size
         #return img
 
-    def write_value(self, cell):
+    def write_value(self, cell, frame):
 
         size = cell.size
         # -- white border
         w_border = roll_value(self.w_border)  # in %
-        w_border = int(w_border * size[0])
+        l_border = int(w_border * size[0]) + frame[0]
+        r_border = int(w_border * size[0]) + frame[2]
         h_border = roll_value(self.h_border)
-        h_border = int(h_border * size[1])
-        width, height = (size[0] - w_border * 2), (size[1] - h_border * 2)
+        t_border = int(h_border * size[1]) + frame[1]
+        b_border = int(h_border * size[1]) + frame[3]
+        width, height = (size[0] - l_border - r_border), (size[1] - t_border - b_border)
 
         # Creating text generator with calculated size, default alignment and my font info
         value_node = {'Text': {'size': {'width': width, 'height': height},
@@ -609,7 +636,7 @@ class TableCell(Generator):
 
         value_gen = Text(value_node)
         value = value_gen.generate(container_size=size)
-        cell.add(value, (w_border, h_border))
+        cell.add(value, (l_border, t_border))
         cell.render()
         return cell
 
@@ -617,9 +644,9 @@ class TableCell(Generator):
         size = self.get_size(container_size, last_w, last_h)
 
         cell = Component(str(self), size, self.node)
+        frame = self.add_frame(cell)
 
-        cell = self.write_value(cell)
-        self.add_frame(cell, 2)
+        cell = self.write_value(cell, frame)
 
         return cell
 
@@ -678,7 +705,7 @@ class Table(Generator):
 
         def roll_cells(table, n_rows, n_cols, axis):
             # N.B. axis is the axis to use for varying values e.g. 0 -> varying widths
-            # trying to keep the values couples to enable swap based on axis
+            # trying to keep the values coupled to enable swap based on axis
             dims = table.size
             grid = n_cols, n_rows
             opposite_axis = abs(axis-1)
@@ -706,14 +733,14 @@ class Table(Generator):
                 min = int(mu * 0.5)
 
                 size = var_side, fixed_side
-                if axis == 1:  # transpose if rolling heights
-                    size = size[1], size[0]
+                #if axis == 1:  # transpose if rolling heights
+                size = size[axis], size[opposite_axis]
                 sizes.append(size)
 
             # === last cell
             size = rem, fixed_side  # fill with last cell
-            if axis == 1:
-                size = size[1], size[0]
+            #if axis == 1:
+            size = size[axis], size[opposite_axis]
             sizes.append(size)
             # ===
 
