@@ -612,26 +612,24 @@ class TableCell(Generator):
         b_size = roll_value(self.frame)
         border_w = PIL.Image.new("L", (img.width, b_size), b_color)
         border_h = PIL.Image.new("L", (b_size, img.height), b_color)
+        t_border_size = b_border_size = l_border_size = r_border_size = 0
+
         if 'top' in self.cell_borders:
             img.paste(border_w, (0, 0))
             t_border_size = b_size
-        else:
-            t_border_size = 0
+
         if 'bottom' in self.cell_borders:
             img.paste(border_w, (0, img.height - b_size))
             b_border_size = b_size
-        else:
-            b_border_size = 0
+
         if 'sx' in self.cell_borders:
             img.paste(border_h, (0, 0))
             l_border_size = b_size
-        else:
-            l_border_size = 0
+
         if 'dx' in self.cell_borders:
             img.paste(border_h, (img.width - b_size, 0))
             r_border_size = b_size
-        else:
-            r_border_size = 0
+
         return l_border_size, t_border_size, r_border_size, b_border_size
 
     def write_value(self, cell, frame):
@@ -653,7 +651,7 @@ class TableCell(Generator):
 
         value_gen = Text(value_node)
         value = value_gen.generate(container_size=size)
-        value.annotate({'value':True, 'key':False})
+        value.annotate({'value': True, 'key': False})
         cell.add(value, (l_border, t_border))
         cell.render()
         return cell
@@ -682,14 +680,9 @@ class Table(Generator):
         self.plain_table = self.node.get('plain_table', True)
         self.cell_w_border = self.node.get('cell_w_border', 0)
         self.cell_h_border = self.node.get('cell_h_border', 0)
-        if roll() < self.node.get('no_row_borders', 0.5):
-            self.no_row_borders = True
-        else:
-            self.no_row_borders = False
-        if roll() < self.node.get('no_col_borders', 0.5):
-            self.no_col_borders = True
-        else:
-            self.no_col_borders = False
+        self.row_frame = self.node.get('row_frame', 1)
+        self.col_frame = self.node.get('col_frame', 1)
+
 
         self.font = self.node.get('font', dict())
         self.f_name = self.font.get('name', DEF_F_NAME)
@@ -700,7 +693,7 @@ class Table(Generator):
         self.v_align = self.node.get('v_align', 'top')
         self.values_file = self.node.get('values_file', None)
         self.headers_file = self.node.get('headers_file', None)
-        self.header = self.node.get('header', False)
+        self.header = self.node.get('header', 0.5)
         self.keys_file = self.node.get('keys_file', None)
 
     def generate(self, container_size=None, last_w=0, last_h=0):
@@ -718,13 +711,21 @@ class Table(Generator):
 
     def gen_cells(self, schema):
         basic_borders = ['top', 'bottom', 'sx', 'dx']
-        if self.no_row_borders:
+        if roll() > self.row_frame:
+            no_row_borders = True
+        else:
+            no_row_borders = False
+        if roll() > self.col_frame:
+            no_col_borders = True
+        else:
+            no_col_borders = False
+        if no_row_borders:
             basic_borders.remove('sx')
             basic_borders.remove('dx')
-        if self.no_col_borders:
+        if no_col_borders:
             basic_borders.remove('top')
             basic_borders.remove('bottom')
-        if self.header:
+        if roll_value(self.header):
             header_w = 0
             header_h = 0
             keys_to_delete = []
@@ -743,14 +744,14 @@ class Table(Generator):
         for coord in schema:
             borders = basic_borders.copy()
             _, (cell_w, cell_h) = schema[coord]
-            if self.no_row_borders:
+            if no_row_borders:
                 if coord[0] == 0:
                     borders.append('sx')
                     if self.header and coord[1] == 0:
                         borders.append('dx')
                 if coord[0] == max_x_coord:
                     borders.append('dx')
-            if self.no_col_borders:
+            if no_col_borders:
                 if coord[1] == 0:
                     borders.append('top')
                     if self.header and coord[0] == 0:
