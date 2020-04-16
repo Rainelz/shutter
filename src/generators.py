@@ -574,6 +574,7 @@ class TableCell(Generator):
     def __init__(self, opt):
         super().__init__(opt)
         self.values_file = self.node.get('values_file', None)
+        self.headers_file = self.node.get('headers_file', None)
         self.w_border = self.node.get('w_border', 0)
         self.h_border = self.node.get('h_border', 0)
 
@@ -710,7 +711,7 @@ class Table(Generator):
         return table
 
     def gen_cells(self, schema):
-        basic_borders = ['top', 'bottom', 'sx', 'dx']
+        basic_borders = ['bottom', 'dx']
         if roll() > self.row_frame:
             no_row_borders = True
         else:
@@ -720,10 +721,8 @@ class Table(Generator):
         else:
             no_col_borders = False
         if no_row_borders:
-            basic_borders.remove('sx')
             basic_borders.remove('dx')
         if no_col_borders:
-            basic_borders.remove('top')
             basic_borders.remove('bottom')
         if roll_value(self.header):
             header_w = 0
@@ -744,25 +743,27 @@ class Table(Generator):
         for coord in schema:
             borders = basic_borders.copy()
             _, (cell_w, cell_h) = schema[coord]
-            if no_row_borders:
-                if coord[0] == 0:
-                    borders.append('sx')
-                    if self.header and coord[1] == 0:
-                        borders.append('dx')
+            values_file = self.values_file
+            if coord[0] == 0:
+                if coord[1] == 0:
+                    values_file = self.headers_file
+                borders.append('sx')
+            if coord[1] == 0:
+                borders.append('top')
+            if self.row_frame:
+                if self.header and coord[1] == 0:
+                    borders.append('dx')
                 if coord[0] == max_x_coord:
                     borders.append('dx')
-            if no_col_borders:
-                if coord[1] == 0:
-                    borders.append('top')
-                    if self.header and coord[0] == 0:
-                        borders.append('bottom')
+            if self.col_frame:
+                if self.header and coord[1] == 0:
+                    borders.append('bottom')
                 if coord[1] == max_y_coord:
                     borders.append('bottom')
 
             cell_node = {'TableCell': {'size': {'width': cell_w, 'height': cell_h},
                                        'font': self.font,
-                                       'values_file': self.values_file,
-                                       'headers_file': self.headers_file,
+                                       'values_file': values_file,
                                        'cell_borders': borders
                                        }
                          }
