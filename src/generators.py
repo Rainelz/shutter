@@ -8,6 +8,7 @@ from collections import defaultdict
 import PIL.Image
 from PIL import ImageDraw
 from itertools import product
+from enum import Enum
 
 import numpy as np
 import numpy.random as random
@@ -573,10 +574,11 @@ class TableCell(Generator):
     def __init__(self, opt):
         super().__init__(opt)
         self.values_file = self.node.get('values_file', None)
-
         self.w_border = self.node.get('w_border', 0)
         self.h_border = self.node.get('h_border', 0)
+
         self.frame = self.node.get('frame', 2)
+        self.cell_borders = self.node.get('cell_borders', ['top', 'bottom', 'sx', 'dx'])
         self.font = self.node.get('font', dict())
         self.f_name = self.font.get('name', DEF_F_NAME)
         self.font_size = self.font.get('size', 'fill')
@@ -610,12 +612,27 @@ class TableCell(Generator):
         b_size = roll_value(self.frame)
         border_w = PIL.Image.new("L", (img.width, b_size), b_color)
         border_h = PIL.Image.new("L", (b_size, img.height), b_color)
-        img.paste(border_w, (0, 0))
-        img.paste(border_w, (0, img.height - b_size))
-        img.paste(border_h, (0, 0))
-        img.paste(border_h, (img.width - b_size, 0))
-        return b_size, b_size, b_size, b_size
-        #return img
+        if 'top' in self.cell_borders:
+            img.paste(border_w, (0, 0))
+            t_border_size = b_size
+        else:
+            t_border_size = 0
+        if 'bottom' in self.cell_borders:
+            img.paste(border_w, (0, img.height - b_size))
+            b_border_size = b_size
+        else:
+            b_border_size = 0
+        if 'sx' in self.cell_borders:
+            img.paste(border_h, (0, 0))
+            l_border_size = b_size
+        else:
+            l_border_size = 0
+        if 'dx' in self.cell_borders:
+            img.paste(border_h, (img.width - b_size, 0))
+            r_border_size = b_size
+        else:
+            r_border_size = 0
+        return l_border_size, t_border_size, r_border_size, b_border_size
 
     def write_value(self, cell, frame):
 
@@ -663,6 +680,16 @@ class Table(Generator):
         self.cell_h = self.cell_size.get('height', 1)
         self.fix_rows = self.node.get('fix_rows', 0.5)
         self.plain_table = self.node.get('plain_table', True)
+        self.cell_w_border = self.node.get('cell_w_border', 0)
+        self.cell_h_border = self.node.get('cell_h_border', 0)
+        if roll() < self.node.get('no_row_borders', 0.5):
+            self.no_row_borders = True
+        else:
+            self.no_row_borders = False
+        if roll() < self.node.get('no_col_borders', 0.5):
+            self.no_col_borders = True
+        else:
+            self.no_col_borders = False
 
         self.font = self.node.get('font', dict())
         self.f_name = self.font.get('name', DEF_F_NAME)
@@ -672,6 +699,8 @@ class Table(Generator):
         self.align = self.node.get('align', 'center')
         self.v_align = self.node.get('v_align', 'top')
         self.values_file = self.node.get('values_file', None)
+        self.headers_file = self.node.get('headers_file', None)
+        self.header = self.node.get('header', False)
         self.keys_file = self.node.get('keys_file', None)
 
     def generate(self, container_size=None, last_w=0, last_h=0):
@@ -688,18 +717,59 @@ class Table(Generator):
         return table
 
     def gen_cells(self, schema):
+        basic_borders = ['top', 'bottom', 'sx', 'dx']
+        if self.no_row_borders:
+            basic_borders.remove('sx')
+            basic_borders.remove('dx')
+        if self.no_col_borders:
+            basic_borders.remove('top')
+            basic_borders.remove('bottom')
+        if self.header:
+            header_w = 0
+            header_h = 0
+            keys_to_delete = []
+            for coord in schema:
+                if coord[1] == 0:
+                    header_w += schema[coord][1][0]
+                    header_h = schema[coord][1][1]
+                    keys_to_delete.append(coord)
+            for k in keys_to_delete:
+                schema.pop(k)
+            schema[(0,0)] = (None, (header_w, header_h))
+
+        max_x_coord = max([c[0] for c in list(schema.keys())])
+        max_y_coord = max([c[1] for c in list(schema.keys())])
 
         for coord in schema:
+            borders = basic_borders.copy()
             _, (cell_w, cell_h) = schema[coord]
+            if self.no_row_borders:
+                if coord[0] == 0:
+                    borders.append('sx')
+                    if self.header and coord[1] == 0:
+                        borders.append('dx')
+                if coord[0] == max_x_coord:
+                    borders.append('dx')
+            if self.no_col_borders:
+                if coord[1] == 0:
+                    borders.append('top')
+                    if self.header and coord[0] == 0:
+                        borders.append('bottom')
+                if coord[1] == max_y_coord:
+                    borders.append('bottom')
+
             cell_node = {'TableCell': {'size': {'width': cell_w, 'height': cell_h},
                                        'font': self.font,
-                                       'values_file': self.values_file
+                                       'values_file': self.values_file,
+                                       'headers_file': self.headers_file,
+                                       'cell_borders': borders
                                        }
                          }
+
             cell_gen = TableCell(cell_node)
             cell_im = cell_gen.generate()
 
-            schema[coord] = cell_im, (cell_w, cell_h)
+            schema[coord] = cell_im, (cell_h, cell_w)
         return schema
 
     def make_table_fixed(self, table, axis):
