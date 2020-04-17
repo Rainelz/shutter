@@ -6,9 +6,8 @@ from pathlib import Path
 from math import ceil
 from collections import defaultdict
 import PIL.Image
-from PIL import ImageDraw
+from PIL import ImageDraw, ImageChops
 from itertools import product
-from enum import Enum
 
 import numpy as np
 import numpy.random as random
@@ -16,6 +15,7 @@ import textwrap
 
 from interfaces import BaseComponent
 from dice_roller import roll, roll_value, fn_map, SAMPLES, get_value_generator
+from utils import text_gen, roll_axis_split
 #from tablegen import TableGen
 #from tablegen import Table
 
@@ -59,6 +59,9 @@ class Component(BaseComponent):
 
     def __str__(self):
         return str(self.__class__.__name__)
+
+    def empty(self):
+        return not ImageChops.invert(self).getbbox()
 
     def update(self, im):
         "Updates internal image"
@@ -123,11 +126,11 @@ def get_position_range(component, container_size, last_x=0, last_y=0):
         if all(isinstance(val, str) for val in x):
             x = random.choice(x)
     if isinstance(x, str):
-        if x == 'head':
+        if x in ['head', 'left']:
             x = 0
         elif x == 'center':
             x = (parent_w - width) // 2
-        elif x == 'tail':
+        elif x in ['tail', 'right']:
             x = parent_w - width
         elif x == 'concatenate':
             x = last_x
@@ -138,11 +141,11 @@ def get_position_range(component, container_size, last_x=0, last_y=0):
         if all(isinstance(val, str) for val in y):
             y = random.choice(y)
     if isinstance(y, str):
-        if y == 'head':
+        if y in ['head', 'top']:
             y = 0
         elif y == 'center':
             y = (parent_h - height) // 2
-        elif y == 'tail':
+        elif y in ['tail', 'bottom']:
             y = parent_h-height
         elif y == 'concatenate':
             y = last_y
@@ -300,27 +303,6 @@ class TextGroup(Generator):
         self.fill = self.font.get('fill', 0)
         self.bold = self.font.get('bold', 0)
 
-    def text_gen(self):
-        import os
-        if self.data_path:
-            file_size = os.path.getsize(self.data_path)
-            offset = roll_value([1, file_size])
-            with open(self.data_path, 'r') as file:
-                file.seek(offset)
-                file.readline()
-
-                while True:
-                    line = file.readline()
-                    if not line:
-                        file.seek(0, 0)
-                        continue
-                    yield line
-        else:
-            while True:
-                text = self.node.get('text', "Placeholder TEXT")
-                for line in text.split('\n'):
-                    yield line
-
     def generate(self, container_size=None, last_w=0, last_h=0):
 
 
@@ -361,15 +343,14 @@ class TextGroup(Generator):
         draw = ImageDraw.Draw(img)
         y = h_border
         width = int(cropped[0]//width*2)
-
-        text_gen = self.text_gen()
+        texts = text_gen(self.data_path)
         fill = roll_value(self.fill)
         font_data.update({'fill': fill})
         x = w_border
 
         while y + l_height <= cropped[1] and n_lines != 0:
 
-            for line in textwrap.wrap(next(text_gen), width=width):
+            for line in textwrap.wrap(next(texts), width=width):
                 l_height = font.getsize(line)[1]
                 if y + l_height > cropped[1] or n_lines==0:
                     break
@@ -390,32 +371,15 @@ class Text(Generator):
         self.n_lines = self.node.get('n_lines', -1)
         self.font = self.node.get('font', dict())
         self.f_name = self.font.get('name', DEF_F_NAME)
+        self.uppercase = self.node.get('uppercase', 0)
 
         self.font_size = self.font.get('size', 'fill')
+        self.font_min = self.font.get('min_size', 8)
         self.fill = self.font.get('fill', 0)
         self.bold = self.font.get('bold', 0)
         self.align = self.node.get('align', 'center')
         self.v_align = self.node.get('v_align', 'center')
-    def text_gen(self):
-        import os
-        if self.data_path:
-            file_size = os.path.getsize(self.data_path)
-            offset = random.randint(1, file_size)
-            with open(self.data_path, 'r') as file:
-                file.seek(offset)
-                file.readline()
-
-                while True:
-                    line = file.readline()
-                    if not line:
-                        file.seek(0, 0)
-                        continue
-                    yield line
-        else:
-            while True:
-                text = self.node.get('text', "Placeholder TEXT")
-                for line in text.split('\n'):
-                    yield line
+        self.background = self.node.get('background', (255,))
 
     def get_font(self, text, size):
         width, height = size
@@ -439,7 +403,7 @@ class Text(Generator):
             max_chars = width // c_width
 
             lines = textwrap.wrap(text, width=int(max_chars))
-            if l_height > height or l_width > width or f_size < 1:  # doesn't fit, go for filling. N.B. single line!
+            if l_height > height or l_width > width:  # doesn't fit, go for filling. N.B. single line!
                 f_size = 'fill'  #
 
         if f_size == 'fill':
@@ -452,16 +416,18 @@ class Text(Generator):
                 except OSError:
                     logging.exception(f"Cannot open font {font_name} with size {f_size}")
                     exit(1)
-                c_width, l_height = font.getsize('Ag')
-                c_width = c_width / 2
+                c_width, l_height = font.getsize(text)
+                c_width = c_width / len(text)
                 max_chars = width // c_width
                 if max_chars > 0:
                     #print(f"f_size {f_size}, max_ch {max_chars}")
                     lines = textwrap.wrap(text, width=int(max_chars))
-                    if l_height < height and len(lines) == 1 or f_size < 1:
+                    if l_height < height and len(lines) == 1:
                         break
 
                 f_size -= 1
+        if f_size < self.font_min:
+            return None, None
         try:
             font = PIL.ImageFont.truetype(font_name, f_size)
         except OSError:
@@ -477,7 +443,7 @@ class Text(Generator):
         size = self.get_size(container_size, last_w, last_h)
 
         # spoilers = self.get_spoilers()
-        img = Component(str(self), size, self.node)
+        img = Component(str(self), size, self.node, background_color=self.background)
         
         #n_lines = roll_value(self.n_lines)
 
@@ -491,31 +457,33 @@ class Text(Generator):
         draw = ImageDraw.Draw(img)
         y = h_border
 
-        text = next(self.text_gen())
+        text = next(text_gen(self.data_path))
+        if roll() <= self.uppercase:
+            text = text.upper()
 
         font, font_data = self.get_font(text, cropped)
+        if font:
+            fill = roll_value(self.fill)
+            font_data.update({'fill': fill})
 
-        fill = roll_value(self.fill)
-        font_data.update({'fill': fill})
+            _, l_height = font.getsize('Ag')
 
-        _, l_height = font.getsize('Ag')
+            align = roll_value(self.align)
+            v_align = roll_value(self.v_align)
+            x = w_border
+            l_width, _ = draw.textsize(text, font)
+            if v_align == 'bottom':
+                y = height-l_height
+            elif v_align == 'center':
+                y = (height-l_height) // 2
 
-        align = roll_value(self.align)
-        v_align = roll_value(self.v_align)
-        x = w_border
-        l_width, _ = draw.textsize(text, font)
-        if v_align == 'bottom':
-            y = height-l_height
-        elif v_align == 'center':
-            y = (height-l_height) // 2
+            if align == 'right':
+                x = width-l_width
+            elif align == 'center':
+                x = (width-l_width) // 2
 
-        if align == 'right':
-            x = width-l_width
-        elif align == 'center':
-            x = (width-l_width) // 2
-
-        draw.text((x,y), text, font=font, fill=fill, align=align)
-        img.annotate({'text': text, 'font': font_data, 'box': [x, y, l_width, l_height]})
+            draw.text((x,y), text, font=font, fill=fill, align=align)
+            img.annotate({'text': text, 'font': font_data, 'box': [x, y, l_width, l_height]})
 
         return img
 
@@ -570,44 +538,37 @@ class Image(Generator):
 
 
 class TableCell(Generator):
-
+    key_value_map = {'top': []}
     def __init__(self, opt):
         super().__init__(opt)
-        self.values_file = self.node.get('values_file', None)
         self.headers_file = self.node.get('headers_file', None)
         self.w_border = self.node.get('w_border', 0)
         self.h_border = self.node.get('h_border', 0)
-
         self.frame = self.node.get('frame', 2)
         self.cell_borders = self.node.get('cell_borders', ['top', 'bottom', 'sx', 'dx'])
-        self.font = self.node.get('font', dict())
-        self.f_name = self.font.get('name', DEF_F_NAME)
-        self.font_size = self.font.get('size', 'fill')
-        self.fill = self.font.get('fill', 0)
-        self.bold = self.font.get('bold', 0)
-        self.align = self.node.get('align', 'center')
-        self.v_align = self.node.get('v_align', 'top')
 
-    def text_gen(self):
-        import os
-        if self.values_file:
-            file_size = os.path.getsize(self.values_file)
-            offset = random.randint(1, file_size)
-            with open(self.values_file, 'r') as file:
-                file.seek(offset)
-                file.readline()
+        self.key = self.node.get('key', dict())
+        self.key_p = self.key.get('p', 0)
+        self.key_font = self.key.get('font', dict())
+        self.key_f_name = self.key_font.get('name', DEF_F_NAME)
+        self.key_upper = self.key.get('uppercase', 0.5)
+        self.key_font_size = self.key_font.get('size', 'fill')
+        self.key_fill = self.key_font.get('fill', 0)
+        self.key_bold = self.key_font.get('bold', 0)
+        self.key_align = self.key.get('align', 'center') # head center tail
+        self.key_v_align = self.key.get('v_align', 'top') # top center bottom
+        self.keys_file = self.key.get('file', None)
 
-                while True:
-                    line = file.readline()
-                    if not line:
-                        file.seek(0, 0)
-                        continue
-                    yield line
-        else:
-            while True:
-                text = self.node.get('value', "123456")
-                for line in text.split('\n'):
-                    yield line
+        self.value = self.node.get('value', dict())
+        self.value_font = self.value.get('font', dict())
+        self.value_f_name = self.value_font.get('name', DEF_F_NAME)
+        self.value_font_size = self.value_font.get('size', 'fill')
+        self.value_fill = self.value_font.get('fill', 0)
+        self.value_bold = self.value_font.get('bold', 0)
+        self.value_align = self.value.get('align', 'center')
+        self.value_v_align = self.node.get('v_align', 'top')
+        self.values_file = self.value.get('file', None)
+
 
     def add_frame(self, img, b_color=0):
         b_size = roll_value(self.frame)
@@ -633,7 +594,7 @@ class TableCell(Generator):
 
         return l_border_size, t_border_size, r_border_size, b_border_size
 
-    def write_value(self, cell, frame):
+    def populate(self, cell, frame):
 
         size = cell.size
         # -- white border
@@ -643,12 +604,34 @@ class TableCell(Generator):
         h_border = roll_value(self.h_border)
         t_border = int(h_border * size[1]) + frame[1]
         b_border = int(h_border * size[1]) + frame[3]
-        width, height = (size[0] - l_border - r_border), (size[1] - t_border - b_border)
+        size = width, height = (size[0] - l_border - r_border), (size[1] - t_border - b_border)
+
+        if roll() <= self.key_p:
+            axis_split = roll_axis_split(width, height) # 1 for horizontal split
+            opposite_ax = abs(axis_split-1)
+            split_size = int(size[axis_split] * roll_value([0.3, 0.7])), size[opposite_ax]  # calc random split on side
+            width_key, height_key = split_size[axis_split], split_size[opposite_ax] # permute if axis == 1
+
+            key_node = {'Text': {'size': {'width': width_key, 'height': height_key},
+                                 'source_path': self.keys_file, 'n_lines': 1,
+                                 'uppercase': self.key_upper,
+                                 'font': self.key_font}}
+
+            key_gen = Text(key_node)
+            key = key_gen.generate(container_size=size)
+            if key.empty():
+                return cell
+            key.annotate({'value': False, 'key': False})
+            cell.add(key, (l_border, t_border))
+            width = size[0] - (width_key * opposite_ax)  # keep side intact or decrement based on axis
+            height = size[1] - (height_key * axis_split)
+            l_border = (l_border * axis_split) + (size[0] - width+l_border) * opposite_ax  # calc offset where to place cell
+            t_border = (t_border * opposite_ax) + (size[1] - height+t_border) * axis_split
 
         # Creating text generator with calculated size, default alignment and my font info
         value_node = {'Text': {'size': {'width': width, 'height': height},
                                'source_path': self.values_file, 'n_lines': 1,
-                               'font': self.font}}
+                               'font': self.value_font}}
 
         value_gen = Text(value_node)
         value = value_gen.generate(container_size=size)
@@ -663,7 +646,7 @@ class TableCell(Generator):
         cell = Component(str(self), size, self.node)
         frame = self.add_frame(cell)
         cell.annotate({'frame': frame})
-        cell = self.write_value(cell, frame)
+        cell = self.populate(cell, frame)
 
         return cell
 
@@ -700,7 +683,7 @@ class Table(Generator):
     def generate(self, container_size=None, last_w=0, last_h=0):
         size = self.get_size(container_size, last_w, last_h)
 
-        table = Component(str(self), size, self.node, background_color=(255,255,255))
+        table = Component(str(self), size, self.node)
         n_rows = roll_value(self.rows)
         n_cols = roll_value(self.cols)
 
@@ -712,18 +695,13 @@ class Table(Generator):
 
     def gen_cells(self, schema):
         basic_borders = ['bottom', 'dx']
+        no_row_borders = no_col_borders = False
+
         if roll() > self.row_frame:
-            no_row_borders = True
-        else:
-            no_row_borders = False
-        if roll() > self.col_frame:
-            no_col_borders = True
-        else:
-            no_col_borders = False
-        if no_row_borders:
             basic_borders.remove('dx')
-        if no_col_borders:
+        if roll() > self.col_frame:
             basic_borders.remove('bottom')
+
         if roll_value(self.header):
             header_w = 0
             header_h = 0
@@ -742,11 +720,13 @@ class Table(Generator):
 
         for coord in schema:
             borders = basic_borders.copy()
+            p_key = 0.5
             _, (cell_w, cell_h) = schema[coord]
             values_file = self.values_file
             if coord[0] == 0:
                 if coord[1] == 0:
                     values_file = self.headers_file
+                    p_key = 0
                 borders.append('sx')
             if coord[1] == 0:
                 borders.append('top')
@@ -763,7 +743,10 @@ class Table(Generator):
 
             cell_node = {'TableCell': {'size': {'width': cell_w, 'height': cell_h},
                                        'font': self.font,
-                                       'values_file': values_file,
+                                       'value': {'file': values_file},
+                                       'key': {'p': p_key,
+                                                'file': self.keys_file,
+                                                 'font': {'size' : 'fill'}},
                                        'cell_borders': borders
                                        }
                          }
@@ -847,6 +830,7 @@ class Table(Generator):
         n_cols = roll_value(self.cols)
         n_rows = roll_value(self.rows)
         cells = roll_cells(table, n_cols, n_rows, axis)
+
         for row in cells:
             for pos, size in row:
                 pos_mapping[pos] = (None, size)
