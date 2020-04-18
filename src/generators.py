@@ -2,6 +2,7 @@ from functools import wraps
 import sys
 import inspect
 import logging
+from copy import deepcopy
 from pathlib import Path
 from math import ceil
 from collections import defaultdict
@@ -15,7 +16,7 @@ import textwrap
 
 from interfaces import BaseComponent
 from dice_roller import roll, roll_value, fn_map, SAMPLES, get_value_generator
-from utils import text_gen, roll_axis_split
+from utils import text_gen, roll_axis_split, roll_table_sizes
 #from tablegen import TableGen
 #from tablegen import Table
 
@@ -108,7 +109,7 @@ def get_generators(node):
         class_name = list(el.keys())[0]
         if class_name in local_classes.keys():
             cls = local_classes[class_name]
-            objects.append(cls(el)) # create generator object
+            objects.append(cls(el))  # create generator object
         else:
             raise AttributeError("error instantiating element", el)
 
@@ -198,6 +199,7 @@ class Generator:
         self.node = node
         self.sizes = get_sizes(node)
         self.generators = get_generators(node)
+        self.background = self.node.get('background', (255,))
         #assert all(gen.p == 1 for gen in self.generators) or sum(gen.p for gen in self.generators) == 1
         self.p = node.get('p', 1)
         self.components = []
@@ -447,7 +449,6 @@ class Text(Generator):
         
         #n_lines = roll_value(self.n_lines)
 
-        # TODO param these
         w_border = roll_value(self.node.get('w_border', 0))  # %
         w_border = int(w_border * size[0])
         h_border = roll_value(self.node.get('h_border', 0))
@@ -562,6 +563,8 @@ class TableCell(Generator):
         self.value = self.node.get('value', dict())
         self.value_font = self.value.get('font', dict())
         self.value_f_name = self.value_font.get('name', DEF_F_NAME)
+        self.value_upper = self.value.get('uppercase', 0)
+
         self.value_font_size = self.value_font.get('size', 'fill')
         self.value_fill = self.value_font.get('fill', 0)
         self.value_bold = self.value_font.get('bold', 0)
@@ -627,10 +630,11 @@ class TableCell(Generator):
             height = size[1] - (height_key * axis_split)
             l_border = (l_border * axis_split) + (size[0] - width+l_border) * opposite_ax  # calc offset where to place cell
             t_border = (t_border * opposite_ax) + (size[1] - height+t_border) * axis_split
-
         # Creating text generator with calculated size, default alignment and my font info
         value_node = {'Text': {'size': {'width': width, 'height': height},
                                'source_path': self.values_file, 'n_lines': 1,
+                               'background': self.background,
+                               'uppercase': self.value_upper,
                                'font': self.value_font}}
 
         value_gen = Text(value_node)
@@ -643,7 +647,7 @@ class TableCell(Generator):
     def generate(self, container_size=None, last_w=0, last_h=0):
         size = self.get_size(container_size, last_w, last_h)
 
-        cell = Component(str(self), size, self.node)
+        cell = Component(str(self), size, self.node, background_color=self.background)
         frame = self.add_frame(cell)
         cell.annotate({'frame': frame})
         cell = self.populate(cell, frame)
@@ -657,11 +661,13 @@ class Table(Generator):
         super().__init__(opt)
         self.cols = self.node.get('cols', 1)
         self.rows = self.node.get('rows', 1)
-        self.cell_size = self.node.get('cell_size', dict())
-        self.cell_w = self.cell_size.get('width', 1)
-        self.cell_h = self.cell_size.get('height', 1)
+        # self.cell_size = self.node.get('cell_size', dict())
+        # self.cell_w = self.cell_size.get('width', 1)
+        # self.cell_h = self.cell_size.get('height', 1)
         self.fix_rows = self.node.get('fix_rows', 0.5)
-        self.plain_table = self.node.get('plain_table', True)
+        self.fix_cols = self.node.get('fix_cols', 0.5)
+
+        #self.plain_table = self.node.get('plain_table', True)
         self.cell_w_border = self.node.get('cell_w_border', 0)
         self.cell_h_border = self.node.get('cell_h_border', 0)
         self.row_frame = self.node.get('row_frame', 1)
@@ -675,189 +681,136 @@ class Table(Generator):
         self.bold = self.font.get('bold', 0)
         self.align = self.node.get('align', 'center')
         self.v_align = self.node.get('v_align', 'top')
+
         self.values_file = self.node.get('values_file', None)
-        self.headers_file = self.node.get('headers_file', None)
-        self.header = self.node.get('header', 0.5)
+        self.title_file = self.node.get('headers_file', None)
+        self.title = self.node.get('title', 0.5)
         self.keys_file = self.node.get('keys_file', None)
+
+        self.fix_keys_col = self.node.get('fix_keys_col', 0.5)
+        self.fix_keys_row = self.node.get('fix_keys_row', 0.5)
 
     def generate(self, container_size=None, last_w=0, last_h=0):
         size = self.get_size(container_size, last_w, last_h)
 
         table = Component(str(self), size, self.node)
-        n_rows = roll_value(self.rows)
-        n_cols = roll_value(self.cols)
 
-        schema = self.make_table_schema(table, n_rows, n_cols)
-        cells = self.gen_cells(schema)
-        self.make_table(table, cells)
+        schema = self.make_schema(table)
+        schema = self.put_borders(schema)
+       # schema = self.fix_fonts(schema) TODO
+        for row in schema:
+            for couple in row:
+                node, position = couple
+                cell_gen = TableCell(node)
+                cell_im = cell_gen.generate()
+                table.add(cell_im, position)
+        table.render()
 
         return table
 
-    def gen_cells(self, schema):
-        basic_borders = ['bottom', 'dx']
-        no_row_borders = no_col_borders = False
+    def put_borders(self, schema):
+        np_schema = np.array([row+[None]*(len(schema[-1])-len(row)) for row in schema]) # fill first row if single cell
+        first_row = np_schema[0,:]
+        first_col = np_schema[:, 0]
+        last_row = np_schema[-1,:]
+        last_col = np_schema[:,-1]
 
-        if roll() > self.row_frame:
-            basic_borders.remove('dx')
-        if roll() > self.col_frame:
-            basic_borders.remove('bottom')
+        if roll() <= self.row_frame:
+            pass
+        if roll() <= self.col_frame:
+            pass
 
-        if roll_value(self.header):
-            header_w = 0
-            header_h = 0
-            keys_to_delete = []
-            for coord in schema:
-                if coord[1] == 0:
-                    header_w += schema[coord][1][0]
-                    header_h = schema[coord][1][1]
-                    keys_to_delete.append(coord)
-            for k in keys_to_delete:
-                schema.pop(k)
-            schema[(0,0)] = (None, (header_w, header_h))
+        # example
+        [node[0]['TableCell'].update(cell_borders=node[0]['TableCell']['cell_borders']+['top', 'bottom']) for node in last_row if node is not None]
+        [node[0]['TableCell'].update(cell_borders=node[0]['TableCell']['cell_borders']+['sx', 'dx']) for node in first_col if node is not None]
 
-        max_x_coord = max([c[0] for c in list(schema.keys())])
-        max_y_coord = max([c[1] for c in list(schema.keys())])
-
-        for coord in schema:
-            borders = basic_borders.copy()
-            p_key = 0.5
-            _, (cell_w, cell_h) = schema[coord]
-            values_file = self.values_file
-            if coord[0] == 0:
-                if coord[1] == 0:
-                    values_file = self.headers_file
-                    p_key = 0
-                borders.append('sx')
-            if coord[1] == 0:
-                borders.append('top')
-            if self.row_frame:
-                if self.header and coord[1] == 0:
-                    borders.append('dx')
-                if coord[0] == max_x_coord:
-                    borders.append('dx')
-            if self.col_frame:
-                if self.header and coord[1] == 0:
-                    borders.append('bottom')
-                if coord[1] == max_y_coord:
-                    borders.append('bottom')
-
-            cell_node = {'TableCell': {'size': {'width': cell_w, 'height': cell_h},
-                                       'font': self.font,
-                                       'value': {'file': values_file},
-                                       'key': {'p': p_key,
-                                                'file': self.keys_file,
-                                                 'font': {'size' : 'fill'}},
-                                       'cell_borders': borders
-                                       }
-                         }
-
-            cell_gen = TableCell(cell_node)
-            cell_im = cell_gen.generate()
-
-            schema[coord] = cell_im, (cell_h, cell_w)
+        schema = np_schema.tolist()
+        schema = [[couple for couple in row if couple is not None] for row in schema]
         return schema
 
-    def make_table_fixed(self, table, axis):
-
-        def roll_cells(table, n_rows, n_cols, axis):
-            # N.B. axis is the axis to use for varying values e.g. 0 -> varying widths
-            # trying to keep the values coupled to enable swap based on axis
-            dims = table.size
-            grid = n_cols, n_rows
-            opposite_axis = abs(axis-1)
-
-            measure = dims[axis]  # width
-            mu = measure / grid[axis]  # width / n_cols
-
-            fixed_side = dims[opposite_axis] // grid[opposite_axis]  # height // n_rows
-
-            rem = measure  # width
-            min = mu * 0.5
-            max_ = mu * 1.5
-            sigma = mu * 0.3
-            sizes = []
-            n_cells = grid[axis]  # per row/col
-
-            #  create 1 row/col sizes, calculating varying width/height, permute if axis == 1
-            for i in range(n_cells-1):
-
-                var_side = int(roll_value({'distribution': 'normal', 'mu': mu, 'sigma': sigma, 'min': min, 'max': max_}))
-                rem -= var_side
-
-                mu = rem / (n_cells - (i + 1))
-                max_ = int(mu * 1.5)
-                min = int(mu * 0.5)
-
-                size = var_side, fixed_side
-                #if axis == 1:  # transpose if rolling heights
-                size = size[axis], size[opposite_axis]
-                sizes.append(size)
-
-            # === last cell
-            size = rem, fixed_side  # fill with last cell
-            #if axis == 1:
-            size = size[axis], size[opposite_axis]
-            sizes.append(size)
-            # ===
-
-            values = list(zip(*sizes))[axis]  # get rolled values on axis
-
-            #  iterate on other dim and calc positions for each cell
-            table_cells = []
-            for i in range(grid[opposite_axis]):
-                var_pos = [sum(values[:j]) for j in range(n_cells)]  # cumulative positions
-                fix_pos = [fixed_side*i for _ in range(n_cells)]  # fixed side positions
-                pos = var_pos, fix_pos
-                # couple positions (var & fixed), eventually swap based on axis
-                pos = list(zip(pos[axis], pos[opposite_axis]))
-
-                group = []
-                for pos, size in zip(pos,sizes): # for each (row/col) create entry (position, size)
-                    cell = (pos, size)
-                    group.append(cell)
-
-                table_cells.append(group)
-
-            # this block permutes the matrix to have values ordered by row
-            # if axis == 1:
-            #     table_cells = np.array(table_cells).reshape((n_cols, n_rows, 2, 1))
-            #     table_cells = np.swapaxes(table_cells, 0, 1).tolist()
-
-            return table_cells
-
-        pos_mapping = dict()
-
+    def make_schema(self, table):
+        "Create a matrix row x cols with (Cell_node, position)"
         n_cols = roll_value(self.cols)
         n_rows = roll_value(self.rows)
-        cells = roll_cells(table, n_cols, n_rows, axis)
+        if roll() <= self.fix_cols:  # fixed dims
+            cell_w = table.width // n_cols
+            widths = [cell_w]*n_cols
+        else:
+            widths = roll_table_sizes(table, n_cols, axis=0)
+        if roll() <= self.fix_rows:
+            cell_h = table.height // n_rows
+            heights = [cell_h] * n_rows
+        else:
+            heights = roll_table_sizes(table, n_rows, axis=1)
 
-        for row in cells:
-            for pos, size in row:
-                pos_mapping[pos] = (None, size)
+        cell_node = {'size': {'width': 0, 'height': 0},
+                     'font': self.font,
+                     'value': {'file': self.values_file},
+                     'key': {'p': 0.5,
+                             'file': self.keys_file,
+                             'font': {'size': 'fill'}
+                             },
+                     'cell_borders': [] # to be filled later on
+                     }
+        pos_mapping = list()
+        row_idx = col_idx = 0
+        if roll() <= self.title:
+            title_node = deepcopy(cell_node)
+            h = heights[0]
+            del title_node['key']
+            title_node['value'].update(file=self.title_file)
+            title_node.update(size={'width': table.width, 'height': h}, is_title=True, background=(255,0,0))
+            pos_mapping.append([({'TableCell': deepcopy(title_node)}, (0,0))])  # first row
+            row_idx = 1
 
+        if roll() <= self.fix_keys_col:
+
+            h = heights[row_idx]
+            y = sum(heights[:row_idx])
+            del cell_node['key']
+
+            key_node = deepcopy(cell_node)
+
+            row = list()
+            for j in range(len(widths)):
+                x = sum(widths[:j])
+                w = widths[j]
+                position = x, y
+                key_node.update(size={'width': w, 'height': h}, is_key=True, background=(0,255,255))
+                key_node['value'].update(file=self.keys_file, uppercase=0.8)
+                row.append(({'TableCell': key_node.copy()}, position))
+            row_idx +=1
+            pos_mapping.append(row)
+
+        # if roll() <= self.fix_keys_row:
+        #     w = widths[col_idx]
+        #     x = sum(widths[:col_idx]) # 0
+        #     key_node = deepcopy(cell_node)
+        #     del key_node['key']
+        #     col = list()
+        #     for i in range(len(heights)):
+
+        while row_idx < len(heights):
+            row = []
+
+            for j in range(len(widths)):
+                x = sum(widths[:j])
+                y = sum(heights[:row_idx])
+                w = widths[j]
+                h = heights[row_idx]
+                position = x, y
+                cell_node.update(size={'width': w, 'height': h}, is_val=True)
+
+                row.append(({'TableCell': cell_node.copy()}, position))
+            pos_mapping.append(row)
+            row_idx += 1
+
+        # this block permutes the matrix to have values ordered by row
+        # if axis == 1:
+        #     table_cells = np.array(table_cells).reshape((n_cols, n_rows, 2, 1))
+        #     table_cells = np.swapaxes(table_cells, 0, 1).tolist()
         return pos_mapping
 
-    def make_table_schema(self, table, n_rows, n_cols):
-        pos_mapping = dict()
-        if self.plain_table:
-            width, height = table.size
-            cell_h = height // n_rows
-            cell_w = width // n_cols
-            couples = product([x for x in range(n_cols)], [y for y in range(n_rows)])
-            for couple in couples:
-                coord = (couple[0] * cell_w, couple[1] * cell_h)
-                pos_mapping[coord] = (None, (cell_w, cell_h))
-            return pos_mapping
-        else:
-            axis = roll_value([0, 1])
-
-            return self.make_table_fixed(table, axis=axis)
-
-    @staticmethod
-    def make_table(table, cells):
-        for cell_pos in cells:
-            table.add(cells[cell_pos][0], cell_pos)
-        table.render()
 
 
 
