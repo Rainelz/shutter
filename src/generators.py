@@ -683,6 +683,10 @@ class Table(Generator):
         self.row_frame = self.node.get('row_frame', 1)
         self.col_frame = self.node.get('col_frame', 1)
 
+        self.cell_spoilers = self.node.get('spoilers', dict()).get('Cell', None)
+        if 'Cell' in self.node.get('spoilers', dict()):
+            self.node['spoilers'] = self.node.get('spoilers').get('Cell')
+            self.node['spoilers'].pop('Cell', None)
 
         self.font = self.node.get('font', dict())
         self.f_name = self.font.get('name', DEF_F_NAME)
@@ -746,6 +750,9 @@ class Table(Generator):
         internal_borders = []
         if roll() <= self.row_frame:
             internal_borders.append('top')
+        else:
+            if first_row[0]['TableCell'].get('is_title', None) is not None:
+                add_bs(['bottom'], first_row)
         if roll() <= self.col_frame:
             internal_borders.append('left')
 
@@ -825,8 +832,10 @@ class Table(Generator):
                 h = heights[row_idx]
                 position = x, y
                 cell_node.update(size={'width': w, 'height': h}, is_val=True)
-
+                if self.cell_spoilers is not None:
+                    cell_node.update({'spoilers': self.cell_spoilers})
                 row.append(({'TableCell': deepcopy(cell_node)}, position))
+
             pos_mapping.append(row)
             row_idx += 1
 

@@ -14,7 +14,7 @@ import cv2
 
 from dice_roller import roll, roll_value, get_value_generator
 from interfaces import Visitor
-from generators import Component
+from generators import Component, TableCell
 
 
 class Spoiler(Visitor):
@@ -470,6 +470,55 @@ class TextSpoiler(Filter):
         pil_im = PIL.Image.fromarray(dilated)
         image._img = pil_im
         return image
+
+class InvertCellBackground(Filter):
+    """Invert background of a cell of the table"""
+
+    def run(self, image):
+        if image.type != 'Table' or image.node.get('modified_bg', None) is not None:# or image.node.get('is_key', None) is None:
+            return image
+        logging.debug(f"Running InvertCellBackground spoiler")
+        for cell in image.elements:
+            if cell[0].node.get('is_key', None) is None:
+                continue
+            cell_inv = PIL.ImageOps.invert(cell[0])
+            border_params = type('border', (object,), {})()
+            if len(cell[0].node.get('cell_borders')) > 0:
+                border_params.cell_borders = cell[0].node.get('cell_borders')
+                frame = cell[0].data['data']['frame'][['left', 'top', 'right', 'bottom'].index(border_params.cell_borders[0])]
+                TableCell.add_frame(border_params, cell_inv, frame)
+            image.paste(cell_inv, cell[1])
+        image.node['invert'] = True
+        return image
+
+class CellBackground(Filter):
+    """Create noise grid and apply to background of a cell of the table"""
+
+    def __init__(self, grey=[220, 255], grid_ratio=2, **kwargs):
+        super().__init__(**kwargs)
+        self.grey = grey
+        self.grid_ratio = grid_ratio
+
+    def run(self, image):
+        if image.type == 'TableCell' and image.node.get('is_key', None) is None: #or image.node.get('invert', None) is not None:
+            elements = [(image, None)]
+        elif image.type == 'Table' and image.node.get('invert', None) is None:
+            elements = [cell for cell in image.elements if cell[0].node.get('is_key', None) is not None]
+            image.node['modified_bg'] = True
+        else:
+            return image
+        logging.debug(f"Running Cell Background with grey {self.grey}")
+        grid_ratio = roll_value(self.grid_ratio)
+        for el in elements:
+            w, h = el[0].size
+            noise = _white_noise(w, h, self.grey, grid_ratio)
+            cell_with_noise = PIL.ImageChops.darker(el[0], noise)
+            if image.type == 'TableCell':
+                image._img = cell_with_noise
+            else:
+                image.paste(cell_with_noise, el[1])
+        return image
+
     #
     # @staticmethod
     # def random():
