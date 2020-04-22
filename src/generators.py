@@ -44,7 +44,7 @@ class Component(BaseComponent):
         color = color or background_color
         self._img = PIL.Image.new(color_space, size, color)
         self.elements = []
-        self.data = defaultdict(list)
+        self.data = defaultdict(dict)
         self.node = node
 
     def __getattr__(self, item):
@@ -94,7 +94,7 @@ class Component(BaseComponent):
         return x, y
 
     def annotate(self, data):
-        self.data['data'].append(data)
+        self.data['data'].update(data)
 
 def get_generators(node):
     elements = node.get('elements', None) # iterate over yaml nodes
@@ -546,7 +546,7 @@ class TableCell(Generator):
         self.w_border = self.node.get('w_border', 0)
         self.h_border = self.node.get('h_border', 0)
         self.frame = self.node.get('frame', 2)
-        self.cell_borders = self.node.get('cell_borders', ['top', 'bottom', 'sx', 'dx'])
+        self.cell_borders = self.node.get('cell_borders', ['top', 'bottom', 'left', 'right'])
 
         self.key = self.node.get('key', dict())
         self.key_p = self.key.get('p', 0)
@@ -572,29 +572,38 @@ class TableCell(Generator):
         self.value_v_align = self.node.get('v_align', 'top')
         self.values_file = self.value.get('file', None)
 
-
-    def add_frame(self, img, b_color=0):
-        b_size = roll_value(self.frame)
+    def add_frame(self, img, b_size, b_color=0):
         border_w = PIL.Image.new("L", (img.width, b_size), b_color)
         border_h = PIL.Image.new("L", (b_size, img.height), b_color)
         t_border_size = b_border_size = l_border_size = r_border_size = 0
 
+
         if 'top' in self.cell_borders:
             img.paste(border_w, (0, 0))
+
             t_border_size = b_size
 
         if 'bottom' in self.cell_borders:
             img.paste(border_w, (0, img.height - b_size))
             b_border_size = b_size
 
-        if 'sx' in self.cell_borders:
+        if 'left' in self.cell_borders:
             img.paste(border_h, (0, 0))
+
             l_border_size = b_size
 
-        if 'dx' in self.cell_borders:
+        if 'right' in self.cell_borders:
             img.paste(border_h, (img.width - b_size, 0))
             r_border_size = b_size
-
+        # if len(self.cell_borders) > 1:  # full borders, put borders on key
+        #     if len(img.elements) > 0:
+        #         subcell = img.elements[0][0]
+        #         if subcell.data['data']['key'] and subcell.data['data']['axis'] == 1:
+        #             sub_height = subcell.height
+        #             img.paste(border_w, (0, sub_height))
+        #         if subcell.data['data']['key'] and subcell.data['data']['axis'] == 0:
+        #             sub_width = subcell.width
+        #             img.paste(border_h, (sub_width, 0))
         return l_border_size, t_border_size, r_border_size, b_border_size
 
     def populate(self, cell, frame):
@@ -602,11 +611,11 @@ class TableCell(Generator):
         size = cell.size
         # -- white border
         w_border = roll_value(self.w_border)  # in %
-        l_border = int(w_border * size[0]) + frame[0]
-        r_border = int(w_border * size[0]) + frame[2]
+        l_border = int(w_border * size[0]) + frame
+        r_border = int(w_border * size[0]) + frame
         h_border = roll_value(self.h_border)
-        t_border = int(h_border * size[1]) + frame[1]
-        b_border = int(h_border * size[1]) + frame[3]
+        t_border = int(h_border * size[1]) + frame
+        b_border = int(h_border * size[1]) + frame
         size = width, height = (size[0] - l_border - r_border), (size[1] - t_border - b_border)
 
         if roll() <= self.key_p:
@@ -623,8 +632,9 @@ class TableCell(Generator):
             key_gen = Text(key_node)
             key = key_gen.generate(container_size=size)
             if key.empty():
-                return cell
-            key.annotate({'value': False, 'key': False})
+                pass
+                #return cell
+            key.annotate({'value': False, 'key': True, 'axis': axis_split})
             cell.add(key, (l_border, t_border))
             width = size[0] - (width_key * opposite_ax)  # keep side intact or decrement based on axis
             height = size[1] - (height_key * axis_split)
@@ -648,10 +658,10 @@ class TableCell(Generator):
         size = self.get_size(container_size, last_w, last_h)
 
         cell = Component(str(self), size, self.node, background_color=self.background)
-        frame = self.add_frame(cell)
+        frame_size = roll_value(self.frame)
+        cell = self.populate(cell, frame_size)
+        frame = self.add_frame(cell, frame_size)
         cell.annotate({'frame': frame})
-        cell = self.populate(cell, frame)
-
         return cell
 
 
@@ -709,27 +719,42 @@ class Table(Generator):
         return table
 
     def put_borders(self, schema):
-        np_schema = np.array([row+[None]*(len(schema[-1])-len(row)) for row in schema]) # fill first row if single cell
-        first_row = np_schema[0,:]
-        first_col = np_schema[:, 0]
-        last_row = np_schema[-1,:]
-        last_col = np_schema[:,-1]
+        """ Take a table schema and fill borders based on params
+            N.B. this method works inplace thus modifies the original schema"""
+        def add_bs(bs, nodes):
+            for node in nodes:
+                if node is None:
+                    continue
+                borders = node['TableCell']['cell_borders']
+                for b in bs:
+                    if b not in borders:
+                        borders.append(b)
 
+        # replicate first cell if row has less cells (title)
+        np_schema = np.array([row+[row[0]]*(len(schema[-1])-len(row)) for row in schema])
+        first_row = np_schema[0, :, 0]  # create list from first row, every column, first couple element
+        first_col = np_schema[:, 0, 0]
+        last_row = np_schema[-1, :, 0]
+        last_col = np_schema[:, -1, 0]
+
+        # externals
+        add_bs(['top'], first_row)
+        add_bs(['left'], first_col)
+        add_bs(['bottom'], last_row)
+        add_bs(['right'], last_col)
+
+        internal_borders = []
         if roll() <= self.row_frame:
-            pass
+            internal_borders.append('top')
         if roll() <= self.col_frame:
-            pass
+            internal_borders.append('left')
 
-        # example
-        [node[0]['TableCell'].update(cell_borders=node[0]['TableCell']['cell_borders']+['top', 'bottom']) for node in last_row if node is not None]
-        [node[0]['TableCell'].update(cell_borders=node[0]['TableCell']['cell_borders']+['sx', 'dx']) for node in first_col if node is not None]
+        add_bs(internal_borders, np_schema[:, :, 0].flatten())  # add every cell right border
 
-        schema = np_schema.tolist()
-        schema = [[couple for couple in row if couple is not None] for row in schema]
         return schema
 
     def make_schema(self, table):
-        "Create a matrix row x cols with (Cell_node, position)"
+        """Create a matrix row x cols with (Cell_node, position)"""
         n_cols = roll_value(self.cols)
         n_rows = roll_value(self.rows)
         if roll() <= self.fix_cols:  # fixed dims
@@ -754,16 +779,16 @@ class Table(Generator):
                      }
         pos_mapping = list()
         row_idx = col_idx = 0
-        if roll() <= self.title:
+        if roll() <= self.title: # create title, one row single cell
             title_node = deepcopy(cell_node)
             h = heights[0]
             del title_node['key']
             title_node['value'].update(file=self.title_file)
-            title_node.update(size={'width': table.width, 'height': h}, is_title=True, background=(255,0,0))
+            title_node.update(size={'width': table.width, 'height': h}, is_title=True)
             pos_mapping.append([({'TableCell': deepcopy(title_node)}, (0,0))])  # first row
             row_idx = 1
 
-        if roll() <= self.fix_keys_col:
+        if roll() <= self.fix_keys_col:  # create keys row
 
             h = heights[row_idx]
             y = sum(heights[:row_idx])
@@ -776,10 +801,10 @@ class Table(Generator):
                 x = sum(widths[:j])
                 w = widths[j]
                 position = x, y
-                key_node.update(size={'width': w, 'height': h}, is_key=True, background=(0,255,255))
+                key_node.update(size={'width': w, 'height': h}, is_key=True)
                 key_node['value'].update(file=self.keys_file, uppercase=0.8)
-                row.append(({'TableCell': key_node.copy()}, position))
-            row_idx +=1
+                row.append(({'TableCell': deepcopy(key_node)}, position))
+            row_idx += 1
             pos_mapping.append(row)
 
         # if roll() <= self.fix_keys_row:
@@ -801,17 +826,14 @@ class Table(Generator):
                 position = x, y
                 cell_node.update(size={'width': w, 'height': h}, is_val=True)
 
-                row.append(({'TableCell': cell_node.copy()}, position))
+                row.append(({'TableCell': deepcopy(cell_node)}, position))
             pos_mapping.append(row)
             row_idx += 1
 
-        # this block permutes the matrix to have values ordered by row
-        # if axis == 1:
-        #     table_cells = np.array(table_cells).reshape((n_cols, n_rows, 2, 1))
-        #     table_cells = np.swapaxes(table_cells, 0, 1).tolist()
         return pos_mapping
 
 
-
-
-
+# this block permutes the matrix to have values ordered by row
+# if axis == 1:
+#     table_cells = np.array(table_cells).reshape((n_cols, n_rows, 2, 1))
+#     table_cells = np.swapaxes(table_cells, 0, 1).tolist()
