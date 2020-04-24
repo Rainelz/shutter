@@ -56,7 +56,7 @@ class Filter:
         return str(self.__class__.__name__)
 
     def annotate(self, component: Component, data):
-        component.data['spoilers'].append(data)
+        component.data['spoilers'].update(data)
 
     def roll_and_run(self, image: Component):
         """Rolls and eventually applies the filter"""

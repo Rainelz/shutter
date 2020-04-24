@@ -48,8 +48,8 @@ def roll_table_sizes(table, splits, axis):
     #fixed_side = dims[opposite_axis] // grid[opposite_axis]  # height // n_rows
 
     rem = measure  # width
-    min = mu * 0.5
-    max_ = mu * 1.5
+    min = mu * 0.8
+    max_ = mu * 1.2
     sigma = mu * 0.3
     sizes = []
 
@@ -59,8 +59,8 @@ def roll_table_sizes(table, splits, axis):
         rem -= var_side
 
         mu = rem / (splits - (i + 1))
-        max_ = int(mu * 1.5)
-        min = int(mu * 0.5)
+        max_ = int(mu * 1.2)
+        min = int(mu * 0.8)
 
         # size = var_side, fixed_side
         # # if axis == 1:  # transpose if rolling heights
