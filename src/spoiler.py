@@ -520,6 +520,31 @@ class CellBackground(Filter):
                 image.paste(cell_with_noise, el[1])
         return image
 
+class ErodeCellText(Filter):
+    """Create noise grid and apply to background of a cell of the table"""
+
+    def __init__(self, scale=0.15, n=5, **kwargs):
+        super().__init__(**kwargs)
+        self.scale = scale
+        self.n = n
+
+    def run(self, image):
+        if image.type != 'TableCell':
+            return image
+        logging.debug(f"Running Erode Cell text")
+        for text, pos in image.elements:
+            blank_im = PIL.Image.new('L', (text.size[0], text.size[1]), 0)
+            size = (int(text.size[0] * self.scale), int(text.size[1] * self.scale))
+            mask = PIL.Image.new('L', size, 255)
+            draw = PIL.ImageDraw.Draw(mask)
+            draw.ellipse((0,0,mask.size[0],mask.size[1]), fill=255)
+            for i in range(self.n):
+                y_ = random.randint(pos[1], pos[1] + text.size[1] - mask.size[1])
+                x_ = random.randint(pos[0], pos[0] + text.size[0] - mask.size[0])
+                blank_im.paste(mask, (x_, y_))
+            image.paste(PIL.ImageChops.lighter(text, blank_im),pos)
+        return image
+
     #
     # @staticmethod
     # def random():
