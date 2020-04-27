@@ -38,6 +38,10 @@ def parse_options():
 
 
 def gen_image(image_generator, visitors, options, i):
+
+    # import cProfile
+    # pr = cProfile.Profile()
+    # pr.enable()
     logging.info(f"{i}/{options.size:04}")
 
     img_file = '%s/spoiled/%s.png' % (options.dir, i)
@@ -51,7 +55,8 @@ def gen_image(image_generator, visitors, options, i):
         image.accept(visitor, file_name=str(i))
 
     image.save(img_file, dpi=(options.dpi, options.dpi))
-
+    # pr.disable()
+    # pr.print_stats()
 def gen_image_pool(generator, visitors, pool_list, opt, seed, update_pbar):
     random.seed(seed)
     logging.debug(f"Initializing thread with seed : {seed}")
@@ -94,6 +99,7 @@ def main():
     pbar = ProgressBar(options.size)
     def update_pbar(item):
         pbar.update(f"Generated {item}")
+
     for i in range(n_workers):
         seed = random.randint(0,2**32-1)
         generator = Generator(opt)

@@ -38,6 +38,9 @@ def roll_axis_split(width, height):  # for key value positioning
         return 1
     return 0
 
+
+MIN_RATIO = 0.8
+MAX_RATIO = 1.2
 def roll_table_sizes(table, splits, axis):
     # N.B. axis is the axis to use for varying values e.g. 0 -> varying widths
     # trying to keep the values coupled to enable swap based on axis
@@ -48,8 +51,8 @@ def roll_table_sizes(table, splits, axis):
     #fixed_side = dims[opposite_axis] // grid[opposite_axis]  # height // n_rows
 
     rem = measure  # width
-    min = mu * 0.8
-    max_ = mu * 1.2
+    min = mu * MIN_RATIO
+    max_ = mu * MAX_RATIO
     sigma = mu * 0.3
     sizes = []
 
@@ -59,8 +62,8 @@ def roll_table_sizes(table, splits, axis):
         rem -= var_side
 
         mu = rem / (splits - (i + 1))
-        max_ = int(mu * 1.2)
-        min = int(mu * 0.8)
+        max_ = int(mu * MAX_RATIO)
+        min = int(mu * MIN_RATIO)
 
         # size = var_side, fixed_side
         # # if axis == 1:  # transpose if rolling heights

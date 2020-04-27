@@ -404,9 +404,10 @@ class Text(Generator):
             c_width = l_width / len(text)
             max_chars = width // c_width
 
-            lines = textwrap.wrap(text, width=int(max_chars))
+            #lines = textwrap.wrap(text, width=int(max_chars))
             if l_height > height or l_width > width:  # doesn't fit, go for filling. N.B. single line!
                 f_size = 'fill'  #
+                logging.debug(f"Can't fit with font size {f_size}, filling...")
 
         if f_size == 'fill':
             font_data.update({'filled':True})
@@ -435,6 +436,7 @@ class Text(Generator):
         except OSError:
             logging.exception(f"Cannot open font {font_name} with size {f_size}")
             exit(1)
+        logging.debug(f"Using font size {f_size}")
         font_data.update({'size': f_size})
 
 
@@ -611,11 +613,11 @@ class TableCell(Generator):
         size = cell.size
         # -- white border
         w_border = roll_value(self.w_border)  # in %
-        l_border = int(w_border * size[0]) + frame
-        r_border = int(w_border * size[0]) + frame
+        l_border = int(w_border * size[0]) + frame[0]
+        r_border = int(w_border * size[0]) + frame[2]
         h_border = roll_value(self.h_border)
-        t_border = int(h_border * size[1]) + frame
-        b_border = int(h_border * size[1]) + frame
+        t_border = int(h_border * size[1]) + frame[1]
+        b_border = int(h_border * size[1]) + frame[3]
         size = width, height = (size[0] - l_border - r_border), (size[1] - t_border - b_border)
 
         if roll() <= self.key_p:
@@ -659,8 +661,8 @@ class TableCell(Generator):
 
         cell = Component(str(self), size, self.node, background_color=self.background)
         frame_size = roll_value(self.frame)
-        cell = self.populate(cell, frame_size)
         frame = self.add_frame(cell, frame_size)
+        cell = self.populate(cell, frame)
         cell.annotate({'frame': frame})
         return cell
 
@@ -683,10 +685,10 @@ class Table(Generator):
         self.row_frame = self.node.get('row_frame', 1)
         self.col_frame = self.node.get('col_frame', 1)
 
-        self.cell_spoilers = self.node.get('spoilers', dict()).get('Cell', None)
-        if 'Cell' in self.node.get('spoilers', dict()):
-            self.node['spoilers'] = self.node.get('spoilers').get('Cell')
-            self.node['spoilers'].pop('Cell', None)
+        self.cell_spoilers = self.node.get('cells_spoilers', dict())
+        # if 'Cell' in self.node.get('spoilers', dict()):
+        #     self.node['spoilers'] = self.node.get('spoilers').get('Cell')
+        #     self.node['spoilers'].pop('Cell', None)
 
         self.font = self.node.get('font', dict())
         self.f_name = self.font.get('name', DEF_F_NAME)
@@ -711,7 +713,7 @@ class Table(Generator):
 
         schema = self.make_schema(table)
         schema = self.put_borders(schema)
-       # schema = self.fix_fonts(schema) TODO
+        #schema = self.fix_fonts(schema) #TODO
         for row in schema:
             for couple in row:
                 node, position = couple
@@ -721,6 +723,18 @@ class Table(Generator):
         table.render()
 
         return table
+
+    def fix_fonts(self, schema):
+        np_schema = np.array([row + [row[0]] * (len(schema[-1]) - len(row)) for row in schema])
+        first_row = np_schema[0, :, 0]  # create list from first row, every column, first couple element
+
+        with open(self.keys_file, 'r') as file:
+            lines = file.readlines()
+            lens = [len(line) for line in lines]
+            median = np.argmax(lens)
+            #gen = Text({'Text':{'font':roll_value(self.font)}})
+            #_, font_data = gen.get_font(lens[median], )
+        return schema
 
     def put_borders(self, schema):
         """ Take a table schema and fill borders based on params
@@ -742,19 +756,21 @@ class Table(Generator):
         last_col = np_schema[:, -1, 0]
 
         # externals
-        add_bs(['top'], first_row)
+        first_row_borders = ['top']
+        if first_row[0]['TableCell'].get('is_title', False) or first_row[0]['TableCell'].get('is_key', False):  # if is title and then no row frame the title must be enclosed
+            first_row_borders.append('bottom')
+
+        add_bs(first_row_borders, first_row)
         add_bs(['left'], first_col)
         add_bs(['bottom'], last_row)
         add_bs(['right'], last_col)
 
         internal_borders = []
         if roll() <= self.row_frame:
-            internal_borders.append('top')
-        else:
-            if first_row[0]['TableCell'].get('is_title', None) is not None:
-                add_bs(['bottom'], first_row)
+            internal_borders.append('bottom')
+
         if roll() <= self.col_frame:
-            internal_borders.append('left')
+            internal_borders.append('right')
 
         add_bs(internal_borders, np_schema[:, :, 0].flatten())  # add every cell right border
 
@@ -776,13 +792,15 @@ class Table(Generator):
             heights = roll_table_sizes(table, n_rows, axis=1)
 
         cell_node = {'size': {'width': 0, 'height': 0},
-                     'font': self.font,
-                     'value': {'file': self.values_file},
+                     'value': {'file': self.values_file,
+                               'font': self.font},
                      'key': {'p': 0.5,
                              'file': self.keys_file,
-                             'font': {'size': 'fill'}
+                             'font': self.font
                              },
-                     'cell_borders': [] # to be filled later on
+                     'cell_borders': [], # to be filled later on
+                     'spoilers': self.cell_spoilers
+
                      }
         pos_mapping = list()
         row_idx = col_idx = 0
@@ -790,7 +808,7 @@ class Table(Generator):
             title_node = deepcopy(cell_node)
             h = heights[0]
             del title_node['key']
-            title_node['value'].update(file=self.title_file)
+            title_node['value'].update(file=self.title_file, font={'size':'fill'})
             title_node.update(size={'width': table.width, 'height': h}, is_title=True)
             pos_mapping.append([({'TableCell': deepcopy(title_node)}, (0,0))])  # first row
             row_idx = 1
@@ -799,9 +817,9 @@ class Table(Generator):
 
             h = heights[row_idx]
             y = sum(heights[:row_idx])
-            del cell_node['key']
 
             key_node = deepcopy(cell_node)
+            del key_node['key']
 
             row = list()
             for j in range(len(widths)):
@@ -832,8 +850,6 @@ class Table(Generator):
                 h = heights[row_idx]
                 position = x, y
                 cell_node.update(size={'width': w, 'height': h}, is_val=True)
-                if self.cell_spoilers is not None:
-                    cell_node.update({'spoilers': self.cell_spoilers})
                 row.append(({'TableCell': deepcopy(cell_node)}, position))
 
             pos_mapping.append(row)

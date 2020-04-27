@@ -45,11 +45,13 @@ class Spoiler(Visitor):
             component.update(spoiler.roll_and_run(component)) # do nothing if not run
 
 
+
 class Filter:
     """Implements basic filter behaviour"""
 
-    def __init__(self, p=1, **_):
+    def __init__(self, p=1, exclude=[], **_):
         assert 0 <= p <= 1
+        self.exclude = exclude
         self.p = p
 
     def type(self):
@@ -61,7 +63,11 @@ class Filter:
     def roll_and_run(self, image: Component):
         """Rolls and eventually applies the filter"""
         if roll() <= self.p:
-            return self.run(image)
+            img = self.run(image)
+            for filter in self.exclude:
+                image_spoilers = image.node.get('spoilers', dict())
+                image_spoilers.get(filter, {'p': 0}).update(p=0)  # clear filter probability
+            return img
 
     def run(self, image: Component):
         pass
@@ -466,7 +472,7 @@ class TextSpoiler(Filter):
 
         kernel = cv2.getStructuringElement(cv2.MORPH_CROSS, (dilate_k, dilate_k))
         dilated = cv2.morphologyEx(cv_im, cv2.MORPH_ERODE, kernel)
-        dilated[dilated != 255] = grey
+        dilated[dilated < 120] = grey
         pil_im = PIL.Image.fromarray(dilated)
         image._img = pil_im
         return image
@@ -475,20 +481,15 @@ class InvertCellBackground(Filter):
     """Invert background of a cell of the table"""
 
     def run(self, image):
-        if image.type != 'Table' or image.node.get('modified_bg', None) is not None:# or image.node.get('is_key', None) is None:
-            return image
         logging.debug(f"Running InvertCellBackground spoiler")
-        for cell in image.elements:
-            if cell[0].node.get('is_key', None) is None:
-                continue
-            cell_inv = PIL.ImageOps.invert(cell[0])
-            border_params = type('border', (object,), {})()
-            if len(cell[0].node.get('cell_borders')) > 0:
-                border_params.cell_borders = cell[0].node.get('cell_borders')
-                frame = cell[0].data['data']['frame'][['left', 'top', 'right', 'bottom'].index(border_params.cell_borders[0])]
-                TableCell.add_frame(border_params, cell_inv, frame)
-            image.paste(cell_inv, cell[1])
-        image.node['invert'] = True
+        for text, pos in image.elements:  # key / value
+            if text.data['data'].get('key', False) or image.node.get('is_key', False):  # invert only keys
+
+                cell_inv = PIL.ImageOps.invert(text)
+                image.paste(cell_inv, pos)
+                image.node['invert'] = True
+
+
         return image
 
 class CellBackground(Filter):
