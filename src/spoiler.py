@@ -206,7 +206,6 @@ class Foreground(Filter):
 
     def run(self, image):
         logging.debug(f"Running Foreground with grey {self.grey}")
-
         w, h = image.size
         grid_ratio = roll_value(self.grid_ratio)
         noise = _white_noise(w, h, self.grey, grid_ratio=grid_ratio)
@@ -520,7 +519,7 @@ class CellBackground(Filter):
                 image.paste(cell_with_noise, el[1])
         return image
 
-class ErodeCellText(Filter):
+class Whiteholes(Filter):
     """Create noise grid and apply to background of a cell of the table"""
 
     def __init__(self, scale=0.15, n=5, **kwargs):
@@ -529,20 +528,19 @@ class ErodeCellText(Filter):
         self.n = n
 
     def run(self, image):
-        if image.type != 'TableCell':
-            return image
         logging.debug(f"Running Erode Cell text")
-        for text, pos in image.elements:
-            blank_im = PIL.Image.new('L', (text.size[0], text.size[1]), 0)
-            size = (int(text.size[0] * self.scale), int(text.size[1] * self.scale))
-            mask = PIL.Image.new('L', size, 255)
-            draw = PIL.ImageDraw.Draw(mask)
-            draw.ellipse((0,0,mask.size[0],mask.size[1]), fill=255)
-            for i in range(self.n):
-                y_ = random.randint(pos[1], pos[1] + text.size[1] - mask.size[1])
-                x_ = random.randint(pos[0], pos[0] + text.size[0] - mask.size[0])
-                blank_im.paste(mask, (x_, y_))
-            image.paste(PIL.ImageChops.lighter(text, blank_im),pos)
+        blank_im = PIL.Image.new('L', (image.size[0], image.size[1]), 0)
+        scale = roll_value(self.scale)
+        size = (int(image.size[0] * scale), int(image.size[1] * scale))
+        mask = PIL.Image.new('L', size, 0)
+        draw = PIL.ImageDraw.Draw(mask)
+        draw.ellipse((0, 0, mask.size[0], mask.size[1]), fill=255)
+        mask = mask.rotate(roll_value([-90, 90]), expand=True, fillcolor=0)
+        for i in range(roll_value(self.n)):
+            y_ = random.randint(0, image.size[1] - mask.size[1])
+            x_ = random.randint(0, image.size[0] - mask.size[0])
+            blank_im.paste(mask, (x_, y_))
+        image.paste(PIL.ImageChops.lighter(image, blank_im))
         return image
 
     #

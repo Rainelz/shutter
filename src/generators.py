@@ -374,7 +374,7 @@ class Text(Generator):
         self.font = self.node.get('font', dict())
         self.f_name = self.font.get('name', DEF_F_NAME)
         self.uppercase = self.node.get('uppercase', 0)
-
+        self.text = self.node.get('text', '')
         self.font_size = self.font.get('size', 'fill')
         self.font_min = self.font.get('min_size', 8)
         self.fill = self.font.get('fill', 0)
@@ -436,7 +436,7 @@ class Text(Generator):
         except OSError:
             logging.exception(f"Cannot open font {font_name} with size {f_size}")
             exit(1)
-        logging.debug(f"Using font size {f_size}")
+        #logging.debug(f"Using font size {f_size}")
         font_data.update({'size': f_size})
 
 
@@ -460,7 +460,7 @@ class Text(Generator):
         draw = ImageDraw.Draw(img)
         y = h_border
 
-        text = next(text_gen(self.data_path))
+        text = next(text_gen(self.data_path, self.text))
         if roll() <= self.uppercase:
             text = text.upper()
 
