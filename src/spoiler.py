@@ -519,30 +519,47 @@ class CellBackground(Filter):
                 image.paste(cell_with_noise, el[1])
         return image
 
-class Whiteholes(Filter):
-    """Create noise grid and apply to background of a cell of the table"""
+class WhiteNoise(Filter):
+    """Create noise mask and apply non white pixels"""
 
-    def __init__(self, scale=0.15, n=5, **kwargs):
+    def __init__(self, ratio=0.05, **kwargs):
         super().__init__(**kwargs)
-        self.scale = scale
-        self.n = n
+        self.ratio = ratio
 
     def run(self, image):
-        logging.debug(f"Running Erode Cell text")
-        blank_im = PIL.Image.new('L', (image.size[0], image.size[1]), 0)
-        scale = roll_value(self.scale)
-        size = (int(image.size[0] * scale), int(image.size[1] * scale))
-        mask = PIL.Image.new('L', size, 0)
-        draw = PIL.ImageDraw.Draw(mask)
-        draw.ellipse((0, 0, mask.size[0], mask.size[1]), fill=255)
-        mask = mask.rotate(roll_value([-90, 90]), expand=True, fillcolor=0)
-        for i in range(roll_value(self.n)):
-            y_ = random.randint(0, image.size[1] - mask.size[1])
-            x_ = random.randint(0, image.size[0] - mask.size[0])
-            blank_im.paste(mask, (x_, y_))
-        image.paste(PIL.ImageChops.lighter(image, blank_im))
+        logging.debug(f"Running WhiteNoise")
+        cv2_im = np.array(image._img)
+        mask = np.where(cv2_im != 255)  # get black pixels
+        mask = np.array(list(zip(*mask)))  # couples
+        n_pixels = len(mask)
+        ratio = roll_value(self.ratio)
+        idx = np.random.choice(len(mask), int(n_pixels*ratio), replace=False)  # random choice pixels to set white
+        mask = mask[idx]
+        mask = tuple(zip(*mask))
+        cv2_im[mask] = 255
+        image.update(PIL.Image.fromarray(cv2_im))
         return image
 
+    class BlackNoise(Filter):
+        """Create noise grid and apply to background of a cell of the table"""
+
+        def __init__(self, ratio=0.05, **kwargs):
+            super().__init__(**kwargs)
+            self.ratio = ratio
+
+        def run(self, image):
+            logging.debug(f"Running WhiteNoise")
+            cv2_im = np.array(image._img)
+            mask = np.where(cv2_im != 255)  # get black pixels
+            mask = np.array(list(zip(*mask)))  # couples
+            n_pixels = len(mask)
+            ratio = roll_value(self.ratio)
+            idx = np.random.choice(len(mask), int(n_pixels * ratio), replace=False)  # random choice pixels to set white
+            mask = mask[idx]
+            mask = tuple(zip(*mask))
+            cv2_im[mask] = 255
+            image.update(PIL.Image.fromarray(cv2_im))
+            return image
     #
     # @staticmethod
     # def random():
