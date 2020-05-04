@@ -8,10 +8,16 @@ def text_gen(file=None, value=None):
         offset = roll_value([1, file_size])
         with open(file, 'r') as file:
             file.seek(offset)
-            file.readline()
-
+            try:
+                file.readline()
+            except:
+                pass
             while True:
-                line = file.readline()
+                try:
+                    line = file.readline()
+                except Exception as e:
+                    print(e)
+                    continue
                 if not line:
                     file.seek(0, 0)
                     continue
