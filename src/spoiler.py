@@ -14,7 +14,7 @@ import cv2
 
 from dice_roller import roll, roll_value, get_value_generator
 from interfaces import Visitor
-from generators import Component
+from generators import Component, TableCell
 
 
 class Spoiler(Visitor):
@@ -45,23 +45,29 @@ class Spoiler(Visitor):
             component.update(spoiler.roll_and_run(component)) # do nothing if not run
 
 
+
 class Filter:
     """Implements basic filter behaviour"""
 
-    def __init__(self, p=1, **_):
+    def __init__(self, p=1, exclude=[], **_):
         assert 0 <= p <= 1
+        self.exclude = exclude
         self.p = p
 
     def type(self):
         return str(self.__class__.__name__)
 
     def annotate(self, component: Component, data):
-        component.data['spoilers'].append(data)
+        component.data['spoilers'].update(data)
 
     def roll_and_run(self, image: Component):
         """Rolls and eventually applies the filter"""
         if roll() <= self.p:
-            return self.run(image)
+            img = self.run(image)
+            for filter in self.exclude:
+                image_spoilers = image.node.get('spoilers', dict())
+                image_spoilers.get(filter, {'p': 0}).update(p=0)  # clear filter probability
+            return img
 
     def run(self, image: Component):
         pass
@@ -200,7 +206,6 @@ class Foreground(Filter):
 
     def run(self, image):
         logging.debug(f"Running Foreground with grey {self.grey}")
-
         w, h = image.size
         grid_ratio = roll_value(self.grid_ratio)
         noise = _white_noise(w, h, self.grey, grid_ratio=grid_ratio)
@@ -466,10 +471,95 @@ class TextSpoiler(Filter):
 
         kernel = cv2.getStructuringElement(cv2.MORPH_CROSS, (dilate_k, dilate_k))
         dilated = cv2.morphologyEx(cv_im, cv2.MORPH_ERODE, kernel)
-        dilated[dilated != 255] = grey
+        dilated[dilated < 120] = grey
         pil_im = PIL.Image.fromarray(dilated)
         image._img = pil_im
         return image
+
+class InvertCellBackground(Filter):
+    """Invert background of a cell of the table"""
+
+    def run(self, image):
+        logging.debug(f"Running InvertCellBackground spoiler")
+        for text, pos in image.elements:  # key / value
+            if text.data['data'].get('key', False) or image.node.get('is_key', False):  # invert only keys
+
+                cell_inv = PIL.ImageOps.invert(text)
+                image.paste(cell_inv, pos)
+                image.node['invert'] = True
+
+
+        return image
+
+class CellBackground(Filter):
+    """Create noise grid and apply to background of a cell of the table"""
+
+    def __init__(self, grey=[220, 255], grid_ratio=2, **kwargs):
+        super().__init__(**kwargs)
+        self.grey = grey
+        self.grid_ratio = grid_ratio
+
+    def run(self, image):
+        if image.type == 'TableCell' and image.node.get('is_key', None) is None: #or image.node.get('invert', None) is not None:
+            elements = [(image, None)]
+        elif image.type == 'Table' and image.node.get('invert', None) is None:
+            elements = [cell for cell in image.elements if cell[0].node.get('is_key', None) is not None]
+            image.node['modified_bg'] = True
+        else:
+            return image
+        logging.debug(f"Running Cell Background with grey {self.grey}")
+        grid_ratio = roll_value(self.grid_ratio)
+        for el in elements:
+            w, h = el[0].size
+            noise = _white_noise(w, h, self.grey, grid_ratio)
+            cell_with_noise = PIL.ImageChops.darker(el[0], noise)
+            if image.type == 'TableCell':
+                image._img = cell_with_noise
+            else:
+                image.paste(cell_with_noise, el[1])
+        return image
+
+class WhiteNoise(Filter):
+    """Create noise mask and apply non white pixels"""
+
+    def __init__(self, ratio=0.05, **kwargs):
+        super().__init__(**kwargs)
+        self.ratio = ratio
+
+    def run(self, image):
+        logging.debug(f"Running WhiteNoise")
+        cv2_im = np.array(image._img)
+        mask = np.where(cv2_im != 255)  # get black pixels
+        mask = np.array(list(zip(*mask)))  # couples
+        n_pixels = len(mask)
+        ratio = roll_value(self.ratio)
+        idx = np.random.choice(len(mask), int(n_pixels*ratio), replace=False)  # random choice pixels to set white
+        mask = mask[idx]
+        mask = tuple(zip(*mask))
+        cv2_im[mask] = 255
+        image.update(PIL.Image.fromarray(cv2_im))
+        return image
+
+    class BlackNoise(Filter):
+        """Create noise grid and apply to background of a cell of the table"""
+
+        def __init__(self, ratio=0.05, **kwargs):
+            super().__init__(**kwargs)
+            self.ratio = ratio
+
+        def run(self, image):
+            logging.debug(f"Running WhiteNoise")
+            cv2_im = np.array(image._img)
+            mask = np.where(cv2_im != 255)  # get black pixels
+            mask = np.array(list(zip(*mask)))  # couples
+            n_pixels = len(mask)
+            ratio = roll_value(self.ratio)
+            idx = np.random.choice(len(mask), int(n_pixels * ratio), replace=False)  # random choice pixels to set white
+            mask = mask[idx]
+            mask = tuple(zip(*mask))
+            cv2_im[mask] = 255
+            image.update(PIL.Image.fromarray(cv2_im))
+            return image
     #
     # @staticmethod
     # def random():
