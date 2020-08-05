@@ -7,6 +7,7 @@ from interfaces import Visitor, BaseComponent
 import PIL.Image
 import logging
 
+
 class LocalExporter(Visitor):
     def __init__(self, path, **kwargs):
         self.depth = 0
@@ -32,6 +33,37 @@ class LocalExporter(Visitor):
                 json.dump(data, f)
 
         return data
+
+
+class GlobalExporter(Visitor):
+    def __init__(self, path, **kwargs):
+        self.depth = 0
+        self.path = Path(path)
+
+    def visit(self, component: BaseComponent, global_x=0, global_y=0, file_name=None, **kwargs):
+
+        self.depth += 1
+        data = {'type': component.type, 'size': component.size, 'elements': []}
+
+        for el, position in component.elements:
+            x, y = position
+
+            sub_data = self.visit(el, global_x+x, global_y+y)
+            sub_data.update(position=(global_x+x, global_y+y))
+            data['elements'].append(sub_data)
+        box = component.data.get('data', dict()).get('box')
+        if box:
+            box[0] = box[0]+global_x
+            box[1] = box[1]+global_y
+        self.depth -= 1
+        data.update(component.data)
+        if self.depth == 0:
+            assert file_name
+            with open(self.path / f'{file_name}.json', 'w') as f:
+                json.dump(data, f)
+
+        return data
+
 
 def get_concat_h(im1, im2):
     dst = PIL.Image.new('RGB', (im1.width + im2.width, im1.height))
