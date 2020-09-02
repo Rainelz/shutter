@@ -1,0 +1,158 @@
+Generator:
+  size:
+    width: 900
+    height: 1200
+  elements:
+    - Text:
+        size:
+          width: [0.5, 0.8]
+          height: 0.03
+        position:
+          x: center
+          y: [0.01, 0.05]
+        text: "This is a title"
+        font:
+          #bold: 1
+          size: fill
+
+    - Text:
+        size:
+          width: [0.5, 0.8]
+          height: [0.01, 0.03]
+        position:
+          x: center
+          y: concatenate
+        h_border: [0, 0.1]
+        w_border: [0, 0.02]
+        text: "This is a subtitle"
+        font:
+          bold: 0
+          size: fill
+    - Image:
+
+        size:
+          width: fill
+          height: 0.03
+        position:
+          x: concatenate
+          y: [0.01, 0.05]
+        files:
+          path: "resources/heading_stamps/"
+          probabilities:
+            github_logo: 0.4
+            github-mark: 0.6
+    - TextGroup:
+        h_border: [0, 0.15]
+        w_border: [0, 0.05]
+        size:
+          width: 0.45
+          height:
+            distribution: normal
+            mu: 0.8
+            sigma: 0.5
+            min: 0.5
+            max: 0.85
+        position:
+          x: [0.025, 0.05]
+          y: 0.15
+        source_path: resources/texts/lorem_ipsum.txt
+        font:
+          size: [14, 24]
+          #italic: 0.2
+          #name: ['Courier New', 'Arial']
+        spoilers:
+          Pad:
+            p: 0.5
+            n: [2, 4]
+    - Container:
+        size:
+          width: 0.45
+          height:
+            distribution: normal
+            mu: 0.8
+            sigma: 0.5
+            min: 0.3
+            max: 0.7
+        position:
+          x: [0.525, 0.55]
+          y: 0.3
+        elements:
+          - Generator:
+              p: 0.5
+              elements:
+                - Image:
+                    file: resources/images/nn.png
+                    size:
+                      height: [0.3, 0.4]
+                      width: [0.8, 0.9]
+                    position:
+                      x: center
+                      y: head
+                - Text:
+                    size:
+                      height: [0.02, 0.05]
+                    text: "Figure 0 - explanation"
+                    w_border: [0, 0.05]
+#                    font:
+                      #bold: 0.5
+                      #italic: 0.5
+                    position:
+                      x: center
+                      y: concatenate
+                - TextGroup:
+                    h_border: [0.01, 0.15]
+                    w_border: [0.01, 0.05]
+                    size:
+                      width: 1
+                      height: fill
+
+                    position:
+                      x: head
+                      y: concatenate
+                    source_path: resources/texts/lorem_ipsum.txt
+                    spoilers:
+                      Pad:
+                        p: 0.5
+                        n: [2, 3]
+
+          - TextGroup:
+              p: 0.5
+              h_border: [0.01, 0.15]
+              w_border: [0.01, 0.05]
+              size:
+                width: 1
+                height: 1
+
+              position:
+                x: head
+                y: head
+              source_path: resources/texts/lorem_ipsum.txt
+              spoilers:
+
+                Pad:
+                  p: 0.5
+                  n: [1, 4]
+  spoilers:
+#    Rotate:
+#      angle: [-3.0, 3.0]
+#      p: 0.3
+    SaltPepper:
+      p: 0.3
+      ratio: 0.5
+      amount: [0.05, 0.2]
+    Foreground:
+      grey: [150, 200]
+      p: 0.3
+    Background:
+      grey: [220,240]
+      grid_ratio: [4, 8]
+      p: 0.3
+    Blur:
+      p: 0.2
+      r: 2
+    JPEGCompression:
+      quality: [20, 75]
+      subsampling: [-1, 2]
+Exporters:
+  #- CoupleExporter: ~
+  - GlobalExporter: ~
