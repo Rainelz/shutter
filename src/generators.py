@@ -230,8 +230,11 @@ class Generator:
 
             if roll() > gen.p:
                 continue  # skip gen
-
-            component = gen.generate(size, last_x2, last_y2)  # generate component
+            try:
+                component = gen.generate(size, last_x2, last_y2)  # generate component
+            except Exception as e:
+                logging.exception(f"Problems generating {gen} {gen.node}")
+                break
             #node = gen.node
             x, y = get_position_range(component, size, last_x2, last_y2)
             x, y = img.check_position_for(x, y, component)
