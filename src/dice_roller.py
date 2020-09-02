@@ -23,6 +23,7 @@ def sample_values():
 
 generator = sample_values()
 
+
 def get_value_generator(node):
     """Returns a value generator from the provided distribution.
     If node is a scalar, return the scalar
@@ -60,6 +61,22 @@ def get_value_generator(node):
             vals = pdf(*args)
             for val in vals:
                 yield val
+
+
+def get_size_generator(node):
+    """Generate width, height values"""
+    size = node.get('size', dict())
+
+    width = size.get('width', 1)
+    height = size.get('height', 1)
+
+    while True:
+        ws = get_value_generator(width)
+        hs = get_value_generator(height)
+
+        for couple in zip(ws, hs):
+            yield couple
+
 
 def roll():
     "Pops a number in [0,1]"

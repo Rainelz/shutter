@@ -4,22 +4,20 @@ import inspect
 import logging
 from copy import deepcopy
 from pathlib import Path
-from math import ceil
+from math import ceil, floor
 from collections import defaultdict
+
 import PIL.Image
 from PIL import ImageDraw, ImageChops
-from itertools import product
 
 import numpy as np
 import numpy.random as random
+
 import textwrap
 
 from interfaces import BaseComponent
-from dice_roller import roll, roll_value, fn_map, SAMPLES, get_value_generator
+from dice_roller import roll, roll_value, get_size_generator
 from utils import text_gen, roll_axis_split, roll_table_sizes
-#from tablegen import TableGen
-#from tablegen import Table
-
 
 
 class Component(BaseComponent):
@@ -36,9 +34,9 @@ class Component(BaseComponent):
             color_space = 'L'
 
         self.type = type
-        color = node.get('background_color', None)
-        color = color or background_color
-        self._img = PIL.Image.new(color_space, size, color)
+       # color = node.get('background_color', None)
+        #color = color or background_color
+        self._img = PIL.Image.new(color_space, size, background_color)
         self.elements = []
         self.data = defaultdict(dict)
         self.node = node
@@ -55,13 +53,13 @@ class Component(BaseComponent):
             return attr
 
     def __str__(self):
-        return str(self.__class__.__name__)
+        return self.type
 
     def empty(self):
         return not ImageChops.invert(self).getbbox()
 
     def update(self, im):
-        "Updates internal image"
+        """Updates internal image"""
         if im is not None and isinstance(im, PIL.Image.Image):
             self._img = im
 
@@ -73,18 +71,18 @@ class Component(BaseComponent):
     def add(self, *items):
         self.elements.append(tuple(items))
 
-    def check_position_for(self, x,y, component):
+    def check_position_for(self, x, y, component):
         if self.elements:
             last_component, last_pos = self.elements[-1]
-            if x == -3:
+            if x == -3: #TODO check this ??
                 x = last_pos[0]+last_component.width
-            if y == -3 :
+            if y == -3:
                 y = last_pos[1]+last_component.height
         if x + component.width > self.size[0]:
-            logging.debug("Forcing position on x")
+            logging.warning(f"Forcing position of {component} on {self} -  ({x + component.width} > {self.size[0]} (width)")
             x = self.size[0] - component.width
         if y + component.height > self.size[1]:
-            logging.debug("Forcing position on y")
+            logging.warning(f"Forcing position of {component} on {self} -  ({y + component.height} > {self.size[1]} (height)")
             y = self.size[1] - component.height
 
         return x, y
@@ -92,14 +90,19 @@ class Component(BaseComponent):
     def annotate(self, data):
         self.data['data'].update(data)
 
+
 def get_generators(node):
-    elements = node.get('elements', None) # iterate over yaml nodes
+    """Given a YML node, iterate over specified elements and instantiate Generators.
+    Returns a list of generator objects"""
+
+    elements = node.get('elements', None)  # iterate over yaml nodes
     if elements is None:
         return []
+
     # create dict class name - constructor
     local_classes = inspect.getmembers(sys.modules[__name__], inspect.isclass)
     local_classes = {name: cls for name, cls in local_classes
-                     if name not in ['Component','BaseComponent'] and not inspect.isabstract(cls)}
+                     if name not in ['Component', 'BaseComponent'] and not inspect.isabstract(cls)}
     objects = []
     for el in elements:
         class_name = list(el.keys())[0]
@@ -110,6 +113,7 @@ def get_generators(node):
             raise AttributeError("error instantiating element", el)
 
     return objects
+
 
 # TODO refactor this
 def get_position_range(component, container_size, last_x=0, last_y=0):
@@ -155,37 +159,26 @@ def get_position_range(component, container_size, last_x=0, last_y=0):
 
     if isinstance(y, (float, int)):
         y = [y, y]
-    baseline_x = ceil(parent_w * x[MIN])
-    baseline_y = ceil(parent_h * y[MIN])
-    max_x = ceil(x[MAX] * parent_w)
-    max_y = ceil(y[MAX] * parent_h)
+
+    baseline_x = floor(parent_w * x[MIN])
+    baseline_y = floor(parent_h * y[MIN])
+    max_x = floor(x[MAX] * parent_w)
+    max_y = floor(y[MAX] * parent_h)
     try:
-        x = random.randint(baseline_x, max(baseline_x, max_x) + 1)
-        y = random.randint(baseline_y, max(baseline_y, max_y) + 1)
+        x = roll_value([baseline_x, max(baseline_x, max_x)])
+        y = roll_value([baseline_y, max(baseline_y, max_y)])
     except ValueError as e:
-        logging.info("Illegal configuration position")
+        logging.warning("Illegal configuration position")
 
     return x, y
-
-# TODO move this
-def get_sizes(node):
-    size = node.get('size', dict())
-
-    width = size.get('width', 1)
-    height = size.get('height', 1)
-
-    while True:
-        ws = get_value_generator(width)
-        hs = get_value_generator(height)
-
-        for couple in zip(ws, hs):
-            yield couple
 
 
 MIN = 0
 MAX = 1
 DEF_F_NAME = 'Arial'
 DEFAULT_NOISE_P = 0.5
+
+
 class Generator:
     """
     Class containing criteria and probabilities to generate a composable image
@@ -193,10 +186,12 @@ class Generator:
     def __init__(self, opt):
         node = opt[self.__class__.__name__]
         self.node = node
-        self.sizes = get_sizes(node)
+        self.sizes = get_size_generator(node)
         self.generators = get_generators(node)
-        self.background = self.node.get('background', (255,))
-        #assert all(gen.p == 1 for gen in self.generators) or sum(gen.p for gen in self.generators) == 1
+        self.background = self.node.get('background_color', (255,255,255))
+        if isinstance(self.background, str):
+            vals = self.background.replace('(', '').replace(')', '').split(',')
+            self.background = tuple([int(val) for val in vals])
         self.p = node.get('p', 1)
         self.components = []
 
@@ -204,11 +199,14 @@ class Generator:
         return str(self.__class__.__name__)
 
     def get_size(self, container_size, last_w, last_h):
+
         width, height = next(self.sizes)
+
         if width == 'fill':
             width = (container_size[0] - last_w) / container_size[0]
         if height == 'fill':
             height = (container_size[1] - last_h) / container_size[1]
+
         if container_size is not None and width <=1:
             width *= container_size[0]
         if container_size is not None and height <= 1:
@@ -217,78 +215,68 @@ class Generator:
         size = int(width), int(height)
         return size
 
-    # def get_spoilers(self):
-    #     noises = []
-    #     for noise in self.node.get('spoilers', list()):
-    #         if isinstance(noise, str):
-    #             p = DEFAULT_NOISE_P
-    #         else:
-    #             noisenode = list(noise.items())[0][1]
-    #             noisename = list(noise.items())[0][0]
-    #
-    #             p = noisenode.get('p', DEFAULT_NOISE_P)
-    #             noise = noisename
-    #         if roll() <= p:
-    #             noises.append(noise)
-    #     return noises
-
     def generate(self, container_size=None, last_w=0, last_h=0):
         """Runs sub-elements generation and computes positions based on the config parameters"""
         size = self.get_size(container_size, last_w, last_h)
         logging.info(f"Generating image with size {size}")
-#        spoilers = self.get_spoilers()
-        img = Component(str(self), size, self.node)
-        available_x, available_y = width, height = size
+
+        img = Component(str(self), size, self.node)  # create component with rolled size
+        #available_x, available_y = width, height = size
         # total_units = 100
         # unit = (height // total_units)
         last_x2 = last_y2 = 0
 
-        # TODO add concatenate position here
-        for gen in self.generators:
+        for gen in self.generators:  # iterate over sub_generators
 
             if roll() > gen.p:
-                continue
-            component = gen.generate(size, last_x2, last_y2)
-            node = gen.node
+                continue  # skip gen
+
+            component = gen.generate(size, last_x2, last_y2)  # generate component
+            #node = gen.node
             x, y = get_position_range(component, size, last_x2, last_y2)
-            x, y = img.check_position_for(x,y,component)
-            last_x2, last_y2 = max(x + component.size[0], last_x2),\
-                               max(y+component.size[1], last_y2)
+            x, y = img.check_position_for(x, y, component)
+
+            last_x2 = max(x + component.size[0], last_x2)
+            last_y2 = max(y + component.size[1], last_y2)
 
             # available_x -= x - baseline_x
             # available_y -= y - baseline_y
 
-            img.add(component, (x,y))
+            img.add(component, (x, y)) # paste generated component
         img.render()
         return img
 
 
 class Container(Generator):
+
     def generate(self, container_size=None, last_w=0, last_h=0):
         """Runs sub-elements generation and computes positions based on the config parameters"""
 
         size = self.get_size(container_size, last_w, last_h)
 
         logging.debug(f"Generating container with size {size}")
+
         img = Component(str(self), size, self.node)
-        available_x, available_y = width, height = size
+        #available_x, available_y = width, height = size
         # total_units = 100
         # unit = (height // total_units)
         probs = [gen.p for gen in self.generators]
         if sum(probs) != 1:
-            probs = None # undefined p, using uniform
+            probs = None  # undefined p, using uniform
+
         chosen = roll_value(list(zip(self.generators, probs)))
+
         im = chosen.generate(size)
-        node = chosen.node
+        #node = chosen.node
         x, y = get_position_range(im, container_size)
         img.add(im, (x, y))
         img.render()
         return img
 
+
 # TODO find a way to refactor these
 class TextGroup(Generator):
     font_sizes = [30, 38, 44, 52]
-    #font_sizes = [50]
     style_map = {'bold': ' Bold', 'italic': ' Italic'}
 
     def __init__(self, opt):
@@ -303,9 +291,8 @@ class TextGroup(Generator):
 
     def generate(self, container_size=None, last_w=0, last_h=0):
 
-
         size = self.get_size(container_size, last_w, last_h)
-        #spoilers = self.get_spoilers()
+
         img = Component(str(self), size, self.node)
 
         n_lines = roll_value(self.n_lines)
@@ -345,17 +332,22 @@ class TextGroup(Generator):
         fill = roll_value(self.fill)
         font_data.update({'fill': fill})
         x = w_border
-
+        x0, y0 = x, y
+        x1 = 0
+        text_data = []
         while y + l_height <= cropped[1] and n_lines != 0:
 
             for line in textwrap.wrap(next(texts), width=width):
-                l_height = font.getsize(line)[1]
+                l_width, l_height = font.getsize(line)
+                x1 = max(x1, l_width)
                 if y + l_height > cropped[1] or n_lines==0:
                     break
-                img.annotate({'text': line, 'font': font_data, 'box': [x, y, width, l_height]})
                 draw.text((x, y), line, font=font, fill=fill)
                 n_lines -= 1
                 y += l_height
+                text_data.append({'text': line, 'font': font_data, 'box': [x, y, width, l_height]})
+        img.annotate({'box': [x0, y0, x1, y], 'text_data':text_data})
+
         return img
 
 
@@ -377,7 +369,7 @@ class Text(Generator):
         self.bold = self.font.get('bold', 0)
         self.align = self.node.get('align', 'center')
         self.v_align = self.node.get('v_align', 'center')
-        self.background = self.node.get('background', (255,))
+        #self.background = self.node.get('background', (255,))
 
     def get_font(self, text, size):
         width, height = size
@@ -515,28 +507,30 @@ class Image(Generator):
         original = PIL.Image.open(file_path)
 
         size = self.get_size(container_size, last_w, last_h)
-        img = Component(str(self), size, self.node, background_color=(255,255,255,255))
-        w_border = random.randint(5,15) #
-        h_border = random.randint(5,15)
+        img = Component(str(self), size, self.node, background_color=self.background)
+        w_border = roll_value(self.node.get('w_border', 0))  # %
+        w_border = int(w_border * size[0])
+        h_border = roll_value(self.node.get('h_border', 0))
+        h_border = int(h_border * size[1])
 
-        cropped = (size[0] - int(size[0] * w_border/100)), (size[1] - int(size[1]*h_border/100))
+        cropped = (size[0] - w_border), (size[1] - h_border)
         im_size = original.size
 
         ratio = min(cropped[0]/float(im_size[0]), cropped[1]/float(im_size[1]))
         new_size = int(im_size[0]*ratio), int(im_size[1]*ratio)
 
         resized = original.resize(new_size, PIL.Image.ANTIALIAS)
-        #self.stamp.show()
-        rand_left = random.randint(0, w_border + cropped[0]-resized.size[0])
-        rand_top = random.randint(0, h_border + cropped[1]-resized.size[1])
+
+        rand_left = roll_value([w_border, cropped[0]-resized.size[0]])
+        rand_top = roll_value([h_border, cropped[1]-resized.size[1]])
         position = rand_left, rand_top
         img.annotate({'image': str(file_path), 'box': [*position, *new_size]})
-        img.paste(resized, position)
+        img.paste(resized, position, resized.convert('RGBA'))  # use alpha mask to paste
         return img
 
 
 class TableCell(Generator):
-    key_value_map = {'top': []}
+    #key_value_map = {'top': []}
     def __init__(self, opt):
         super().__init__(opt)
         self.headers_file = self.node.get('headers_file', None)
@@ -557,6 +551,8 @@ class TableCell(Generator):
         self.key_v_align = self.key.get('v_align', 'top') # top center bottom
         self.keys_file = self.key.get('file', None)
 
+        self.is_title = self.node.get('is_title', False)
+
         self.value = self.node.get('value', dict())
         self.value_font = self.value.get('font', dict())
         self.value_f_name = self.value_font.get('name', DEF_F_NAME)
@@ -573,7 +569,6 @@ class TableCell(Generator):
         border_w = PIL.Image.new("L", (img.width, b_size), b_color)
         border_h = PIL.Image.new("L", (b_size, img.height), b_color)
         t_border_size = b_border_size = l_border_size = r_border_size = 0
-
 
         if 'top' in self.cell_borders:
             img.paste(border_w, (0, 0))
@@ -640,7 +635,7 @@ class TableCell(Generator):
         # Creating text generator with calculated size, default alignment and my font info
         value_node = {'Text': {'size': {'width': width, 'height': height},
                                'source_path': self.values_file, 'n_lines': 1,
-                               'background': self.background,
+                               'background_color': self.background,
                                'uppercase': self.value_upper,
                                'font': self.value_font}}
 
@@ -658,7 +653,7 @@ class TableCell(Generator):
         frame_size = roll_value(self.frame)
         frame = self.add_frame(cell, frame_size)
         cell = self.populate(cell, frame)
-        cell.annotate({'frame': frame})
+        cell.annotate({'frame': frame, 'title':self.is_title })
         return cell
 
 
@@ -793,13 +788,13 @@ class Table(Generator):
                              'file': self.keys_file,
                              'font': self.font
                              },
-                     'cell_borders': [], # to be filled later on
+                     'cell_borders': [],  # to be filled later on
                      'spoilers': self.cell_spoilers
 
                      }
         pos_mapping = list()
         row_idx = col_idx = 0
-        if roll() <= self.title: # create title, one row single cell
+        if roll() <= self.title:  # create title, one row single cell
             title_node = deepcopy(cell_node)
             h = heights[0]
             del title_node['key']

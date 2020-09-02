@@ -24,6 +24,7 @@ def config_logger(out_dir):
     logger.addHandler(file_handler)
     logger.addHandler(stdout_handler)
 
+
 def parse_options():
     parser = argparse.ArgumentParser(description='Generated text and images.')
     parser.add_argument('--config', required=True, help='path to YAML config file')
@@ -32,7 +33,6 @@ def parse_options():
     parser.add_argument('--dir', required=True, help='path of the output directory')
     parser.add_argument('--size', type=int, default=100, help='how many examples to generate')
     parser.add_argument('--dpi', type=int, default=70, help='Noisy images dpi')
-
 
     return parser.parse_args()
 
@@ -57,16 +57,22 @@ def gen_image(image_generator, visitors, options, i):
     image.save(img_file, dpi=(options.dpi, options.dpi))
     # pr.disable()
     # pr.print_stats()
+
+
 def gen_image_pool(generator, visitors, pool_list, opt, seed, update_pbar):
     random.seed(seed)
     logging.debug(f"Initializing thread with seed : {seed}")
     for item in pool_list:
         gen_image(generator, visitors, opt, item)
         update_pbar(item)
+
+
 def main():
     import numpy as np
     options = parse_options()
+    os.makedirs(options.dir, exist_ok=True)
     config_logger(options.dir)
+
     with open(options.config, 'r') as stream:
         try:
             opt = yaml.safe_load(stream)
@@ -74,6 +80,7 @@ def main():
             print(exc)
             logging.exception(exc)
             exit(1)
+
     gt_dir = f"{options.dir}/original"
     data_dir = f"{options.dir}/spoiled"
     export_dir = f"{options.dir}/export"
@@ -101,7 +108,7 @@ def main():
         pbar.update(f"Generated {item}")
 
     for i in range(n_workers):
-        seed = random.randint(0,2**32-1)
+        seed = random.randint(0, 2**32-1)
         generator = Generator(opt)
         spoiler = Spoiler()
         exporters = from_options(opt, export_dir)
