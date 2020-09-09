@@ -742,7 +742,7 @@ class Table(Generator):
                         borders.append(b)
 
         # replicate first cell if row has less cells (title)
-        np_schema = np.array([row+[row[0]]*(len(schema[-1])-len(row)) for row in schema])
+        np_schema = np.array([row+[row[0]]*(len(schema[-1])-len(row)) for row in schema], dtype=object)
         first_row = np_schema[0, :, 0]  # create list from first row, every column, first couple element
         first_col = np_schema[:, 0, 0]
         last_row = np_schema[-1, :, 0]

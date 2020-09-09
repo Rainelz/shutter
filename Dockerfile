@@ -48,7 +48,7 @@ ENV PATH="${PYENV_ROOT}/shims:${PYENV_ROOT}/bin:$PATH"
 # install env in project with
 ENV PIPENV_VENV_IN_PROJECT=true
 RUN DEBIAN_FRONTEND=noninteractive apt-get update && apt-get -y install git build-essential zlib1g-dev \
-        libffi-dev libssl-dev libbz2-dev libreadline-dev libsm6 curl libsqlite3-dev "libglib2.0-0" libxrender1
+        libffi-dev libssl-dev libbz2-dev libreadline-dev libsm6 curl libsqlite3-dev "libglib2.0-0" libgl1-mesa-dev libxrender1
 RUN git clone --branch v1.2.13 https://github.com/yyuu/pyenv.git ${PYENV_ROOT} && \
     pyenv install "$PY_VERSION" && \
     pyenv global ${PY_VERSION} && \
