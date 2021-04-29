@@ -29,7 +29,6 @@ Generator:
           bold: 0
           size: fill
     - Image:
-
         size:
           width: fill
           height: 0.03
@@ -93,9 +92,9 @@ Generator:
                       height: [0.02, 0.05]
                     text: "Figure 0 - explanation"
                     w_border: [0, 0.05]
-#                    font:
-                      #bold: 0.5
-                      #italic: 0.5
+                    #                    font:
+                    #bold: 0.5
+                    #italic: 0.5
                     position:
                       x: center
                       y: concatenate
@@ -128,14 +127,13 @@ Generator:
                 y: head
               source_path: resources/texts/lorem_ipsum.txt
               spoilers:
-
                 Pad:
                   p: 0.5
                   n: [1, 4]
   spoilers:
-#    Rotate:
-#      angle: [-3.0, 3.0]
-#      p: 0.3
+    #    Rotate:
+    #      angle: [-3.0, 3.0]
+    #      p: 0.3
     SaltPepper:
       p: 0.3
       ratio: 0.5
@@ -144,7 +142,7 @@ Generator:
       grey: [150, 200]
       p: 0.3
     Background:
-      grey: [220,240]
+      grey: [220, 240]
       grid_ratio: [4, 8]
       p: 0.3
     Blur:
