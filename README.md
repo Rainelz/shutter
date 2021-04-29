@@ -1,7 +1,7 @@
 # Shutter
 
 A Python Tool for the generation of images with different layouts and noise combinations.
-Shutter is basically a metamodel leveraging the [Composite Pattern](https://en.wikipedia.org/wiki/Composite_pattern) for generating images + [Visitor Pattern](https://en.wikipedia.org/wiki/Visitor_pattern) to apply different spoilers -independentely- or to navigate the structure.
+Shutter is basically a metamodel leveraging the [Composite Pattern](https://en.wikipedia.org/wiki/Composite_pattern) for generating images + [Visitor Pattern](https://en.wikipedia.org/wiki/Visitor_pattern) to apply different noises or to navigate the structure.
 
 The tool loads a YAML configuration file where the generation model is defined, i.e. each component is defined along with the optional noises to apply on it as well as the probability distributions of various parameters.
 
@@ -60,7 +60,7 @@ See [Container](#container) for mutual exclusion.
 
 ## Generator
 
-The basic component to play with in shutter. Defines its size (eventually a position relative to a parent) and a list of sub-components.
+The basic component generator to play with in shutter. Defines its size (eventually a position relative to a parent) and a list of sub-components. Must instatiate a `Component` object (which is an augmented Pillow image) and return it.
 
 ### Basic parameters
 
@@ -141,6 +141,25 @@ An image that can be sampled from a set or be constant. if `files` is defined, `
 
 A logical container useful to define mutually exclusive Components. The configuration syntax is almost equal to Generator less than it assumes that for each defined sub-component there is an associated probability of being picked for generation.
 
+## Table
+
+A Table with configurable layout.
+`cols`: number of columns
+`rows`: number of rows
+`fix_keys_col` : probability of cells to have a top key text
+`fix_rows` : probability of having fixed rows height
+`fix_cols` : probability of having fixed cols width
+`row_frame` : probability of cells having horizontal borders
+`col_frame` : probability of cells having vertical borders
+`title`: probability of table header row
+`headers_file` : file of lines to sample from for `title`
+`keys_file` : file of lines to sample from for cells `keys`
+`values_file` : file of lines to sample from for cells `values`
+`keys_uppercase`: probability of keys to be uppercase
+
+`cells_spoiler` : list of spoilers to apply randomly to single cells
+`spoilers`: list of spoiler to apply to the table
+
 # Spoilers
 
 Each of the defined Component can define a list of accepted spoilers and the associated likelihood.
@@ -191,30 +210,44 @@ Adds a vertical line
 
 Adds a intensity gradient to the component
 
+### WhiteNoise
+
+`ratio`
+
+### Background
+
+`grey`
+
+### JPEGCompression
+
+`quality` / `subsampling`
+
 # Exporters
 
-Currently only a local JSON exporter and a coupler (GT/spoiled) are implemented.
+Exporters are run on each model instance and visit the generated tree structure to output annotations (or some final postprocessing) on the generated image.
+Currently the exporters dumps generation and spoilers informations such as type of component, size, applied spoilers, rolled values (when available) and data contained.
+
+## GlobalExporter
+
+Global Exporter outputs coordinates with respect to the image origin (top-left)
 
 ## LocalExporter
 
-Local exporter means that each coordinate is exported with respect to its frame origin.
-The Local exporter dumps generation and spoilers informations such as type of component, size, applied spoilers, rolled values (when available) and data contained.
-
-More to come...
+Local exporter outputs coordinates with respect to each component origin (doesn't account nested position offsets)
 
 # Create custom Component
 
-To implement a custom component you will have to extend the Generator class.
+Components are resolved by reflection when they are named in the `config` file. It is sufficient to add a class extending `Generator`, a constructor accepting a dict with the params and a `generate`.
 
-A generator takes its yaml node as argument from which it can take initialization parameters and store relevant informations
-for the actual generation step.
+A generator takes its yaml node as argument from which it can take initialization parameters and store relevant informations for the actual generation step.
 
-In the generate function, you basically pop random values and return a drawn component which will contain useful informations
-for future spoilers.
+In the generate function, you basically pop random values and return a drawn component which will contain useful informations for future spoilers.
 
-To pop a random value for a parameter (node with param name and distribution values): just call the `roll_value` function
-and pass the node as argument.
+To pop a random value for a parameter (node with param name and distribution values): just call the `roll_value` function and pass the node as argument.
+See some generators [implementations](src/generators.py)
 
 # Create custom Spoiler
+
+Spoilers must extend the `Filter` class, they received unpacked args from the yaml node, and must override a `run(self, image):` method returning the spoiled image
 
 # Create custom Exporter
