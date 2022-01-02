@@ -57,6 +57,10 @@ def get_value_generator(node):
             while True:
                 yield random.uniform(low, high)
 
+        case [0, float(high)]:  # list of [0, float] (QoL)
+            while True:
+                yield random.uniform(0, high)
+
         case [[_, _], *_] | [
             (_, _),
             *_,
