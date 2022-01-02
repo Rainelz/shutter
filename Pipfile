@@ -15,6 +15,7 @@ python_version = "3.10"
 
 [scripts]
 init = "pre-commit install"
+check = "pre-commit run --all-files"
 
 [dev-packages]
 pre-commit = "*"

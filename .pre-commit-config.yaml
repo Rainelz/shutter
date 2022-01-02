@@ -22,19 +22,20 @@ repos:
   hooks:
   - id: reorder-python-imports
     args: [--application-directories, .:src, --py36-plus]
-- repo: https://github.com/myint/docformatter
-  rev: v1.4
-  hooks:
-  - id: docformatter
-    args: [--in-place]
+#- repo: https://github.com/myint/docformatter
+#  rev: v1.4
+#  hooks:
+#  - id: docformatter
+#    args: [--in-place]
 - repo: https://github.com/ambv/black
   rev: 21.12b0
   hooks:
   - id: black
-    language_version: python3.9
+    language_version: python3.10
+    args: [--target-version, py310]
 - repo: https://gitlab.com/pycqa/flake8
-  rev: 3.9.2
+  rev: 4.0.1
   hooks:
   - id: flake8
 #        additional_dependencies: [radon]
-#        args: ["--radon-max-cc=10", "--radon-show-closures"]
+#        args: ["--radon-max-cc=10", "--radon-show-closures"]  # wait for radon to support 3.10

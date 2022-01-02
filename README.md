@@ -2,17 +2,24 @@ TODO
 - refactor to leverage 3.10 pattern matching
 - separate generators
 - add docstrings
--
+- split readme
 # Shutter
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
-A Python Tool for the generation of images with different layouts and noise combinations.
+A Python Tool for generating images with different layouts and noise combinations by defining yaml templates.
 Shutter is basically a metamodel leveraging the [Composite Pattern](https://en.wikipedia.org/wiki/Composite_pattern) for generating images + [Visitor Pattern](https://en.wikipedia.org/wiki/Visitor_pattern) to apply different noises or to navigate the structure.
 
-The tool loads a YAML configuration file where the generation model is defined, i.e. each component is defined along with the optional noises to apply on it as well as the probability distributions of various parameters.
+The tool loads a YAML configuration file where the generation model is defined, namely each logical component is defined along with the optional noises to apply on it.
 
-It exports by default the ground truth images, the spoiled images, and a yaml containing the parameters used for the generation (including the seed used to initialize the random state to enable determinism between run).
-In addition to that, the tool runs the exporters defined into the yaml file. see [Exporters](#exporters)
+Each parameter to be used can be fixed or sampled at runtime using the defined distribution.
+
+Shutter generates by default 3 folders:
+1. `original` containing the ground truth images;
+2. `spoiled` containing the original images with noise applied,
+3. `annotations` containing a JSON file for each generated image. These JSONs will contain positions and potentially relative data about each generated component and spoiler applied to it
+4. a `config.yaml` file containing the parameters used for the generation (including the seed used to initialize the random state to enable determinism between runs).
+
+For more details about the exporters, see [Exporters](#exporters)
 
 ## Requirements
 
@@ -20,8 +27,14 @@ In addition to that, the tool runs the exporters defined into the yaml file. see
 - `pipenv` - `pip install pipenv`
 
 ## Installation
+### Dev
+- `pyenv install 3.10.1` if not yet installed
+- `pipenv sync --dev` should install py 3.8 environment with required packages
+- `pipenv run init` installs pre-commit hook
+- `pipenv run check` runs pre-commit checks on all files
 
-- `pyenv install 3.8.5` if not yet installed
+### User
+- `pyenv install 3.10.1` if not yet installed
 - `pipenv sync` should install py 3.8 environment with required packages
 
 # Running
@@ -30,11 +43,12 @@ run `pipenv run python src/shutter.py -h` to know supported args
 
 run `pipenv run python src/shutter.py --config $CONFIG_FILE --size $K --dir $PATH_TO_OUT_DIR [--workers N] [--out FILE_PREFIX]` to start the image generation
 
-# Docker image
+# Docker image - RECOMMENDED
+The docker image is recommended for configurations using multiple fonts.
+It's built to use dumb-init to enable proper terminations of the workers. For more see https://github.com/Yelp/dumb-init
+And it's easily deployable to a pod
 
-The docker image uses dumb-init to enable proper terminations of the workers. For more see https://github.com/Yelp/dumb-init
-
-Simply build the docker image (which includes a font package), and run by mounting your local folders inside the docker container
+Simply build the docker image, and run by mounting your local folders inside the docker container
 
 ```
 docker build -t shutter .
@@ -49,7 +63,7 @@ docker run shutter fc-list
 e.g. running with `complex.yml` as model
 
 ```
-export OUT_PATH=/local/path/to/dir
+export OUT_PATH=/local/path/to/output/dir
 export MOUNT_DATAPATH=/opt/app/data
 
 docker run -v $OUT_PATH:$MOUNT_DATAPATH shutter dumb-init pipenv run python src/shutter.py --config examples/complex.yml --dir $MOUNT_DATAPATH --size 3 --workers 8 --out complex_out --dpi 70
@@ -66,7 +80,9 @@ See [Container](#container) for mutual exclusion.
 
 ## Generator
 
-The basic component generator to play with in shutter. Defines its size (eventually a position relative to a parent) and a list of sub-components. Must instatiate a `Component` object (which is an augmented Pillow image) and return it.
+The basic component to play with in shutter. Each other component will inherit Generator fields.
+
+Defines its size (possibly a position relative to a parent) and a list of sub-components `elements`.
 
 ### Basic parameters
 
@@ -81,19 +97,31 @@ elements:
   - Generators...
 ```
 
-Each value node can be filled with an absolute value (H = 2000) or a value < 1 denoting its relation to the parent Generator.
+Each value node in the YAML can be filled with an absolute value (H = 2000) or a value < 1 denoting its relation to the parent Generator.
 
 #### Spatial values
+Components can define where they should be placed in the image, and how big they can be.
 
+`position` accepted values are:
+- `float` < 1 - to denote a value relative to it's parent considered axis
+- `int` - absolute value to fix position
+- `'concatenate'` to fill any empty space wrt the closest element on considered axis
+`size` accepted values are:
+- `float` < 1 - to denote a value relative to it's parent considered axis
+- `int` - absolute value to fix size
+- `'fill'` to fill any empty remaining space on the considered axis
+-
+example
 ```
-position:
-  x: 0.5
-  y : concatenate
 size:
   height: fill
+  width: 0.3
+ position:
+  x: 0.5
+  y : concatenate
 ```
 
-will place the object sized `(1*parent_width, parent_free_height)` top left corner at `(0.5 * parent_width, parent_height - object_height)`
+will place the object sized `(0.3*parent_width, parent_free_height)` top left corner at `(0.5 * parent_width, closest_free_parent_pixel)`
 
 ### Define Randomness
 
@@ -119,11 +147,6 @@ Defines a Component generator which will produce images with:
 
 **height** sampled from a uniform distribution in the interval [1000, 1800]
 
-## TextGroup
-
-A block of text. Loads lazily random text from a `source_path` or fixed `text` taken from the yaml.`{h/w}_border` defines an optional % region of the image to be left blank
-
-TODO: Rename to padding
 
 ## Text
 
@@ -138,6 +161,12 @@ Text:
     italic: ~
     size: fill
 ```
+
+## TextGroup
+
+A block of text. Loads lazily random text from a `source_path` or fixed `text` taken from the yaml.`{h/w}_border` defines an optional % region of the image to be left blank
+
+TODO: Rename to padding
 
 ## Image
 
@@ -243,7 +272,8 @@ Local exporter outputs coordinates with respect to each component origin (doesn'
 
 # Create custom Component
 
-Components are resolved by reflection when they are named in the `config` file. It is sufficient to add a class extending `Generator`, a constructor accepting a dict with the params and a `generate`.
+Components are resolved by reflection when they are named in the `config` file. It is sufficient to add a class extending `Generator`,
+implementing a constructor accepting a dict with the params and a `generate` function.
 
 A generator takes its yaml node as argument from which it can take initialization parameters and store relevant informations for the actual generation step.
 
