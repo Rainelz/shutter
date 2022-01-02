@@ -5,11 +5,11 @@ FROM ubuntu:18.04
 #
 
 RUN apt-get update && apt-get -y install locales apt-utils dumb-init
-RUN locale-gen en_US.UTF-8  
+RUN locale-gen en_US.UTF-8
 ENV TZ="Europe/Rome"
-ENV LANG en_US.UTF-8  
-ENV LANGUAGE en_US:en  
-ENV LC_ALL en_US.UTF-8  
+ENV LANG en_US.UTF-8
+ENV LANGUAGE en_US:en
+ENV LC_ALL en_US.UTF-8
 
 #
 #
@@ -28,7 +28,7 @@ RUN useradd -l -u ${USER_UID} -r -g 0 -d ${APP_ROOT} -s /sbin/nologin -c "${USER
     chmod -R g=u ${APP_ROOT} /etc/passwd
 
 ## Fonts install
-    
+
 RUN apt-get update && apt-get -qq -y install curl bzip2 wget cabextract xfonts-utils fontconfig
 RUN wget http://ftp.uk.debian.org/debian/pool/contrib/m/msttcorefonts/ttf-mscorefonts-installer_3.7_all.deb
 
@@ -41,7 +41,7 @@ RUN fc-cache -f -v
 #
 # --- Pyenv and pipenv ---
 #
-ENV PY_VERSION="3.7.4"
+ENV PY_VERSION="3.10.1"
 ENV PYENV_ROOT="${APP_ROOT}/pyenv"
 # add shim to path, this avoid running pyenv init -
 ENV PATH="${PYENV_ROOT}/shims:${PYENV_ROOT}/bin:$PATH"
@@ -49,12 +49,12 @@ ENV PATH="${PYENV_ROOT}/shims:${PYENV_ROOT}/bin:$PATH"
 ENV PIPENV_VENV_IN_PROJECT=true
 RUN DEBIAN_FRONTEND=noninteractive apt-get update && apt-get -y install git build-essential zlib1g-dev \
         libffi-dev libssl-dev libbz2-dev libreadline-dev libsm6 curl libsqlite3-dev "libglib2.0-0" libgl1-mesa-dev libxrender1
-RUN git clone --branch v1.2.13 https://github.com/yyuu/pyenv.git ${PYENV_ROOT} && \
+RUN git clone https://github.com/pyenv/pyenv.git ${PYENV_ROOT} && \
     pyenv install "$PY_VERSION" && \
     pyenv global ${PY_VERSION} && \
     pip install --upgrade pip && \
     pip install pipenv && \
-    pyenv rehash 
+    pyenv rehash
 
 
 ENV PROJ_ROOT=${APP_ROOT}/shutter
@@ -64,9 +64,6 @@ COPY Pipfile.lock ${PROJ_ROOT}/Pipfile.lock
 
 WORKDIR ${PROJ_ROOT}
 
-RUN pipenv sync 
+RUN pipenv sync
 
 COPY . ${PROJ_ROOT}
-
-
-

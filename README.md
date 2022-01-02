@@ -1,4 +1,10 @@
+TODO
+- refactor to leverage 3.10 pattern matching
+- separate generators
+- add docstrings
+-
 # Shutter
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
 A Python Tool for the generation of images with different layouts and noise combinations.
 Shutter is basically a metamodel leveraging the [Composite Pattern](https://en.wikipedia.org/wiki/Composite_pattern) for generating images + [Visitor Pattern](https://en.wikipedia.org/wiki/Visitor_pattern) to apply different noises or to navigate the structure.
@@ -10,7 +16,7 @@ In addition to that, the tool runs the exporters defined into the yaml file. see
 
 ## Requirements
 
-- `pyenv` - `brew install pyenv` or visit `https://github.com/pyenv/pyenv-installer`
+- [OPTIONAL] `pyenv` - `brew install pyenv` or visit `https://github.com/pyenv/pyenv-installer`
 - `pipenv` - `pip install pipenv`
 
 ## Installation
@@ -44,9 +50,9 @@ e.g. running with `complex.yml` as model
 
 ```
 export OUT_PATH=/local/path/to/dir
-export IMG_DATAPATH=/opt/app/data
+export MOUNT_DATAPATH=/opt/app/data
 
-docker run -v $OUT_PATH:$IMG_DATAPATH shutter dumb-init pipenv run python src/shutter.py --config examples/complex.yml --dir $IMG_DATAPATH --size 3 --workers 8 --out complex_out --dpi 70
+docker run -v $OUT_PATH:$MOUNT_DATAPATH shutter dumb-init pipenv run python src/shutter.py --config examples/complex.yml --dir $MOUNT_DATAPATH --size 3 --workers 8 --out complex_out --dpi 70
 ```
 
 Example configurations available in [examples](examples)

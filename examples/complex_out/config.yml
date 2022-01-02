@@ -1,5 +1,5 @@
 Exporters:
-- GlobalExporter: null
+- GlobalExporter:
 Generator:
   elements:
   - Container:

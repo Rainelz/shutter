@@ -1,4 +1,4 @@
-2021-04-27 18:04:17,200 INFO - [7] Starting generation with seed 2754052347 
+2021-04-27 18:04:17,200 INFO - [7] Starting generation with seed 2754052347
 2021-04-27 18:04:17,211 DEBUG - [52] Initializing thread with seed : 371684724
 2021-04-27 18:04:17,212 INFO - [52] complex_test_0000/0003
 2021-04-27 18:04:17,213 INFO - [52] Generating image with size (2479, 3508)
@@ -159,7 +159,7 @@
 2021-04-27 18:04:25,673 DEBUG - [54] Running Background with grey [220, 240]
 2021-04-27 18:04:25,935 DEBUG - [54] Running JPEGCompression with quality: 52 and subsampling 1
 2021-04-27 18:04:28,410 DEBUG - [52] Running JPEGCompression with quality: 38 and subsampling 1
-2021-04-27 18:04:44,307 INFO - [7] Starting generation with seed 3669667200 
+2021-04-27 18:04:44,307 INFO - [7] Starting generation with seed 3669667200
 2021-04-27 18:04:44,318 DEBUG - [52] Initializing thread with seed : 3735037572
 2021-04-27 18:04:44,320 INFO - [52] complex_test_0000/0003
 2021-04-27 18:04:44,320 INFO - [52] Generating image with size (2479, 3508)
@@ -196,7 +196,7 @@
 2021-04-27 18:04:46,238 INFO - [54] Generated Image. Applying spoilers
 2021-04-27 18:04:46,275 DEBUG - [54] Running TextSpoilere with grey: 165 and kernel 3
 2021-04-27 18:04:46,446 DEBUG - [54] Running JPEGCompression with quality: 31 and subsampling 1
-2021-04-27 18:04:57,078 INFO - [8] Starting generation with seed 2141527280 
+2021-04-27 18:04:57,078 INFO - [8] Starting generation with seed 2141527280
 2021-04-27 18:04:57,087 DEBUG - [53] Initializing thread with seed : 4283929456
 2021-04-27 18:04:57,088 INFO - [53] complex_test_0000/0003
 2021-04-27 18:04:57,089 INFO - [53] Generating image with size (2479, 3508)

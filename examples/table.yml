@@ -3,43 +3,43 @@ Generator:
     width: 800
     height: 300
   elements:
-    - Table:
-        size:
-          width: 0.9
-          height: 0.9
-        position:
-          x: center
-          y: center
-        fix_keys_row: 0.5
-        fix_keys_col: 0.5
-        cell_size:
-          width: [0.2, 0.5]
-          height: [0.1, 0.3]
-        row_frame: 0.5
-        col_frame: 0.5
-        title : 0.5
-        headers_file: resources/texts/tabletop_list.txt
-        values_file: resources/texts/values.txt
-        keys_file: resources/texts/key_list.txt
-        keys_uppercase: 0.5
-        font:
-          size: [12, 20]
+  - Table:
+      size:
+        width: 0.9
+        height: 0.9
+      position:
+        x: center
+        y: center
+      fix_keys_row: 0.5
+      fix_keys_col: 0.5
+      cell_size:
+        width: [0.2, 0.5]
+        height: [0.1, 0.3]
+      row_frame: 0.5
+      col_frame: 0.5
+      title: 0.5
+      headers_file: resources/texts/tabletop_list.txt
+      values_file: resources/texts/values.txt
+      keys_file: resources/texts/key_list.txt
+      keys_uppercase: 0.5
+      font:
+        size: [12, 20]
           #bold: 0.2
-        cols: [4, 8]
-        rows: [4, 8]
-        cells_spoilers:
-          Background:
-            p: 0.1
-            grey: [220, 240]
-          InvertCellBackground:
-            p: 0.05
-        spoilers:
-          WhiteNoise:
-            ratio: [0.05, 0.3]
-            p: 0.5
+      cols: [4, 8]
+      rows: [4, 8]
+      cells_spoilers:
+        Background:
+          p: 0.1
+          grey: [220, 240]
+        InvertCellBackground:
+          p: 0.05
+      spoilers:
+        WhiteNoise:
+          ratio: [0.05, 0.3]
+          p: 0.5
 
 
 
         #value:
 Exporters:
-  - GlobalExporter: ~
+- GlobalExporter:

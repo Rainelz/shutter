@@ -1,14 +1,16 @@
 from __future__ import annotations
-from abc import ABC, abstractmethod
+
+from abc import ABC
+from abc import abstractmethod
 
 
 class BaseComponent(ABC):
-    """
-    Abstract class defining the component interface for visitors
-    """
+    """Abstract class defining the component interface for visitors."""
+
     elements = NotImplemented
     node = NotImplemented
     data = NotImplemented
+
     @abstractmethod
     def update(self, val):
         pass
@@ -19,9 +21,6 @@ class BaseComponent(ABC):
 
 
 class Visitor(ABC):
-
     @abstractmethod
     def visit(self, component: BaseComponent, **kwargs):
         pass
-
-

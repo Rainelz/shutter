@@ -3,54 +3,54 @@ Generator:
     width: 1500
     height: 2200
   elements:
-    - TextGroup:
-        h_border: [0, 0.15]
-        w_border: [0, 0.05]
-        size:
-          width: [0.7, 0.9]
-          height:
-            distribution: normal
-            mu: 0.8
-            sigma: 0.5
-            min: 0.3
-            max: 0.8
-        position:
-          x: [0.05, 0.1]
-          y: center
-        source_path: resources/texts/lorem_ipsum.txt
-        font:
-          size: [20, 60]
-        spoilers:
-          WhiteNoise:
-            ratio: [0.2, 0.5]
-            p: 0.5
-            exclude:
-              - TextSpoiler
-          TextSpoiler:
-            grey: [120, 200]
+  - TextGroup:
+      h_border: [0, 0.15]
+      w_border: [0, 0.05]
+      size:
+        width: [0.7, 0.9]
+        height:
+          distribution: normal
+          mu: 0.8
+          sigma: 0.5
+          min: 0.3
+          max: 0.8
+      position:
+        x: [0.05, 0.1]
+        y: center
+      source_path: resources/texts/lorem_ipsum.txt
+      font:
+        size: [20, 60]
+      spoilers:
+        WhiteNoise:
+          ratio: [0.2, 0.5]
+          p: 0.5
+          exclude:
+          - TextSpoiler
+        TextSpoiler:
+          grey: [120, 200]
 
-          Blur:
-            p: 0
-            r: [2,3]
-          Pad:
-            p: 0.5
-            n: [2, 10]
-    - Text:
-        size:
-          width: 1
-          height: 0.025
-        text: "I'm a footer text line."
-        font:
-          bold: 0
-          italic : 0
-        w_border: 0
-        position:
-          y: tail
-        align: ['left','center', 'right'] # sample uniformely
+        Blur:
+          p: 0
+          r: [2, 3]
+        Pad:
+          p: 0.5
+          n: [2, 10]
+  - Text:
+      size:
+        width: 1
+        height: 0.025
+      text: I'm a footer text line.
+      font:
+        bold: 0
+        italic: 0
+      w_border: 0
+      position:
+        y: tail
+      align: [left, center, right]        # sample uniformely
   spoilers:
     Rotate:
       angle: [-3.0, 3.0]
       p: 0
 #    SaltPepper: ~
 Exporters:
-  - GlobalExporter: ~
+- GlobalExporter:

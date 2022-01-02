@@ -1,18 +1,20 @@
 # Modified from https://github.com/open-mmlab/mmcv/blob/master/mmcv/utils/progressbar.py
 import sys
-from collections.abc import Iterable
-from multiprocessing import Pool, Value, Lock
-from shutil import get_terminal_size
 import time
+from collections.abc import Iterable
+from multiprocessing import Lock
+from multiprocessing import Pool
+from multiprocessing import Value
+from shutil import get_terminal_size
 
 
 class ProgressBar(object):
-    """A progress bar which can print the progress"""
+    """A progress bar which can print the progress."""
 
     def __init__(self, task_num=0, bar_width=50, start=True, file=sys.stdout):
         self.task_num = task_num
         self.bar_width = bar_width
-        self.completed = Value('i', 0)
+        self.completed = Value("i", 0)
         self.file = file
         self.lock = Lock()
         if start:
@@ -25,10 +27,13 @@ class ProgressBar(object):
 
     def start(self):
         if self.task_num > 0:
-            self.file.write('[{}] 0/{}, elapsed: 0s, ETA:\n{}\n'.format(
-                ' ' * self.bar_width, self.task_num, 'Start...'))
+            self.file.write(
+                "[{}] 0/{}, elapsed: 0s, ETA:\n{}\n".format(
+                    " " * self.bar_width, self.task_num, "Start..."
+                )
+            )
         else:
-            self.file.write('completed: 0, elapsed: 0s')
+            self.file.write("completed: 0, elapsed: 0s")
         self.file.flush()
         self.start_time = time.time()
 
@@ -41,37 +46,44 @@ class ProgressBar(object):
             val = self.completed.value
         return val
 
-    def update(self, msg='In progress...'):
+    def update(self, msg="In progress..."):
         self.inc()
         completed = self.get_completed()
         elapsed = time.time() - self.start_time
         if elapsed > 0:
             fps = completed / elapsed
         else:
-            fps = float('inf')
+            fps = float("inf")
         if self.task_num > 0:
             percentage = completed / float(self.task_num)
             eta = int(elapsed * (1 - percentage) / percentage + 0.5)
-            msg = '\r[{{}}] {}/{}, {:.1f} task/s, elapsed: {}s, ETA: {:5}s\n{}\n' \
-                  ''.format(completed, self.task_num, fps,
-                            int(elapsed + 0.5), eta, msg)
+            msg = (
+                "\r[{{}}] {}/{}, {:.1f} task/s, elapsed: {}s, ETA: {:5}s\n{}\n"
+                "".format(completed, self.task_num, fps, int(elapsed + 0.5), eta, msg)
+            )
 
-            bar_width = min(self.bar_width,
-                            int(self.terminal_width - 50),
-                            int(self.terminal_width * 0.6))
+            bar_width = min(
+                self.bar_width,
+                int(self.terminal_width - 50),
+                int(self.terminal_width * 0.6),
+            )
             bar_width = max(2, bar_width)
             mark_width = int(bar_width * percentage)
-            bar_chars = '>' * mark_width + ' ' * (bar_width - mark_width)
+            bar_chars = ">" * mark_width + " " * (bar_width - mark_width)
 
-            self.file.write('\033[2F')  # cursor up 2 lines
-            self.file.write('\033[J')  # clean the output (remove extra chars since last display)
-            #self.file.write('\033[F')  # cursor up 2 lines
+            self.file.write("\033[2F")  # cursor up 2 lines
+            self.file.write(
+                "\033[J"
+            )  # clean the output (remove extra chars since last display)
+            # self.file.write('\033[F')  # cursor up 2 lines
 
             self.file.write(msg.format(bar_chars))
         else:
             self.file.write(
-                'completed: {}, elapsed: {}s, {:.1f} tasks/s'.format(
-                    completed, int(elapsed + 0.5), fps))
+                "completed: {}, elapsed: {}s, {:.1f} tasks/s".format(
+                    completed, int(elapsed + 0.5), fps
+                )
+            )
         self.file.flush()
 
 
@@ -98,14 +110,13 @@ def track_progress(func, tasks, bar_width=50, file=sys.stdout, **kwargs):
     elif isinstance(tasks, Iterable):
         task_num = len(tasks)
     else:
-        raise TypeError(
-            '"tasks" must be an iterable object or a (iterator, int) tuple')
+        raise TypeError('"tasks" must be an iterable object or a (iterator, int) tuple')
     prog_bar = ProgressBar(task_num, bar_width, file=file)
     results = []
     for task in tasks:
         results.append(func(task, **kwargs))
         prog_bar.update()
-    prog_bar.file.write('\n')
+    prog_bar.file.write("\n")
     return results
 
 
@@ -120,16 +131,18 @@ def init_pool(process_num, initializer=None, initargs=None):
         return Pool(process_num, initializer, initargs)
 
 
-def track_parallel_progress(func,
-                            tasks,
-                            nproc,
-                            initializer=None,
-                            initargs=None,
-                            bar_width=50,
-                            chunksize=1,
-                            skip_first=False,
-                            keep_order=True,
-                            file=sys.stdout):
+def track_parallel_progress(
+    func,
+    tasks,
+    nproc,
+    initializer=None,
+    initargs=None,
+    bar_width=50,
+    chunksize=1,
+    skip_first=False,
+    keep_order=True,
+    file=sys.stdout,
+):
     """Track the progress of parallel task execution with a progress bar.
 
     The built-in :mod:`multiprocessing` module is used for process pools and
@@ -164,8 +177,7 @@ def track_parallel_progress(func,
     elif isinstance(tasks, Iterable):
         task_num = len(tasks)
     else:
-        raise TypeError(
-            '"tasks" must be an iterable object or a (iterator, int) tuple')
+        raise TypeError('"tasks" must be an iterable object or a (iterator, int) tuple')
     pool = init_pool(nproc, initializer, initargs)
     start = not skip_first
     task_num -= nproc * chunksize * int(skip_first)
@@ -184,14 +196,15 @@ def track_parallel_progress(func,
                 prog_bar.start()
                 continue
         prog_bar.update()
-    prog_bar.file.write('\n')
+    prog_bar.file.write("\n")
     pool.close()
     pool.join()
     return results
 
 
 def track_iter_progress(tasks, bar_width=50, file=sys.stdout, **kwargs):
-    """Track the progress of tasks iteration or enumeration with a progress bar.
+    """Track the progress of tasks iteration or enumeration with a progress
+    bar.
 
     Tasks are yielded with a simple for-loop.
 
@@ -212,10 +225,9 @@ def track_iter_progress(tasks, bar_width=50, file=sys.stdout, **kwargs):
     elif isinstance(tasks, Iterable):
         task_num = len(tasks)
     else:
-        raise TypeError(
-            '"tasks" must be an iterable object or a (iterator, int) tuple')
+        raise TypeError('"tasks" must be an iterable object or a (iterator, int) tuple')
     prog_bar = ProgressBar(task_num, bar_width, file=file)
     for task in tasks:
         yield task
         prog_bar.update()
-    prog_bar.file.write('\n')
+    prog_bar.file.write("\n")

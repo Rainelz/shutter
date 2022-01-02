@@ -7,8 +7,14 @@ verify_ssl = true
 numpy = "*"
 pyyaml = "*"
 pillow = "*"
-scipy = "==1.3.3"
+scipy = "*"
 opencv-python = "*"
 
 [requires]
-python_version = "3.7"
+python_version = "3.10"
+
+[scripts]
+init = "pre-commit install"
+
+[dev-packages]
+pre-commit = "*"

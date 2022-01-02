@@ -5,314 +5,314 @@ Generator:
     width: 2479
     height: 3508
   elements:
-    - Container:
-        size:
-          width: 1
-          height: 1
-        position:
-          x: head
-          y: head
-        elements:
-          - Generator: # single table
-              p: 0.25 # p of being picked
-              elements:
-                - Table:
-                    position:
-                      x: center
-                      y: [head, center, tail]
-                    size:
-                      height: [0.7, 0.98]
-                      width: [0.8, 0.98]
-                    fix_keys_col: 0.5  # p of fixing keys for columns
-                    row_frame: 0.5  # p of rows having frame
-                    col_frame: 0.3
-                    fix_rows: 0.7  # p of rows having fixed size
-                    fix_cols: 0.7
-                    title : 0.8   # p of having title
-                    headers_file: resources/texts/tabletop_list.txt  # files for text values
-                    values_file: resources/texts/values.txt
-                    keys_file: resources/texts/key_list.txt
-                    keys_uppercase: 0.5  # p of having key uppercase
-                    font:  # font data
-                      size: [20, 60]
-                      bold: 0.2
-                      name: ['Times New Roman', 'Arial']
-                    cols: [4,8]
-                    rows: [10,30]
-                    cells_spoilers:
-                      Background:
-                        p: 0.1
-                        grey: [220, 240]
-                      InvertCellBackground:
-                        p: 0.05
+  - Container:
+      size:
+        width: 1
+        height: 1
+      position:
+        x: head
+        y: head
+      elements:
+      - Generator:     # single table
+          p: 0.25     # p of being picked
+          elements:
+          - Table:
+              position:
+                x: center
+                y: [head, center, tail]
+              size:
+                height: [0.7, 0.98]
+                width: [0.8, 0.98]
+              fix_keys_col: 0.5        # p of fixing keys for columns
+              row_frame: 0.5        # p of rows having frame
+              col_frame: 0.3
+              fix_rows: 0.7        # p of rows having fixed size
+              fix_cols: 0.7
+              title: 0.8          # p of having title
+              headers_file: resources/texts/tabletop_list.txt        # files for text values
+              values_file: resources/texts/values.txt
+              keys_file: resources/texts/key_list.txt
+              keys_uppercase: 0.5        # p of having key uppercase
+              font:        # font data
+                size: [20, 60]
+                bold: 0.2
+                name: [Times New Roman, Arial]
+              cols: [4, 8]
+              rows: [10, 30]
+              cells_spoilers:
+                Background:
+                  p: 0.1
+                  grey: [220, 240]
+                InvertCellBackground:
+                  p: 0.05
 
-                    w_border: [0.05, 0.15]  # white space to be kept
-                    h_border: [0.05, 0.1]
-                    spoilers:
-                      TextSpoiler:
-                        p: 0.3
-                        grey: [120, 200]
-                      Foreground:
-                        p: 0.3
-                        grid_ratio: [4,12]
-                        grey: [120, 200]
-                      Blur:
-                        p: 0.2
-                        r: 2
-          - Generator: # mixed
-              p: 0.5
+              w_border: [0.05, 0.15]        # white space to be kept
+              h_border: [0.05, 0.1]
+              spoilers:
+                TextSpoiler:
+                  p: 0.3
+                  grey: [120, 200]
+                Foreground:
+                  p: 0.3
+                  grid_ratio: [4, 12]
+                  grey: [120, 200]
+                Blur:
+                  p: 0.2
+                  r: 2
+      - Generator:     # mixed
+          p: 0.5
+          elements:
+          - Generator:       # title + img
+              size:
+                width: 1
+                height: 0.2
+              position:
+                x: center
+                y: [0.01, 0.05]
               elements:
-                - Generator: # title + img
-                    size:
-                      width: 1
-                      height: 0.2
-                    position:
-                      x: center
-                      y: [0.01, 0.05]
-                    elements:
-                      - Text:
+              - Text:
+                  size:
+                    width: [0.5, 0.8]
+                    height: 0.7
+                  position:
+                    x: center
+                    y: [0.01, 0.1]
+                  text: This is a title
+                  font:
+                    name: [Courier New, Arial]
+                    bold: 1
+                    size: fill
+                  v_align: bottom
+                  spoilers:
+                    Foreground:
+                      p: 0.2
+                      grey: [120, 255]
+                      grid_ratio: 4
+              - Text:
+                  size:
+                    width: [0.5, 0.8]
+                    height: [0.1, 0.2]
+                  position:
+                    x: center
+                    y: concatenate
+                  h_border: [0, 0.1]
+                  w_border: [0, 0.02]
+                  text: This is a subtitle
+                  font:
+                    bold: 0
+                    size: fill
+                    name: [Courier New, Arial]
+                  spoilers:
+                    TextSpoiler:
+                      p: 0.2
+                      grey: [120, 200]
+              - Image:
+                  size:
+                    width: fill
+                    height: 0.8
+                  position:
+                    x: concatenate
+                    y: [0.01, 0.05]
+                  files:
+                    path: resources/heading_stamps/
+                    probabilities:
+                      github_logo: 0.25
+                      github-mark: 0.75
+          - Container:        # double column text + img / text + table
+              size:
+                width: 0.9
+                height: fill
+              position:
+                x: center
+                y: concatenate
+              elements:
+              - Generator:          # double column text + optional img
+                  p: 0.5
+
+                  elements:
+                  - TextGroup:           # text column 1
+                      h_border: [0, 0.15]
+                      w_border: [0, 0.05]
+                      size:
+                        width: 0.45
+                        height:
+                          distribution: normal
+                          mu: 0.8
+                          sigma: 0.5
+                          min: 0.5
+                          max: 0.85
+                      position:
+                        x: [0.025, 0.05]
+                        y: head
+                      source_path: resources/texts/lorem_ipsum.txt
+                      font:
+                        size: [30, 45]
+                        italic: 0.2
+                        name: [Courier New, Arial]
+
+                  - Container:           # text col 2 + [img]
+                      size:
+                        width: 0.45
+                        height:
+                          distribution: normal
+                          mu: 0.8
+                          sigma: 0.5
+                          min: 0.3
+                          max: 0.7
+                      position:
+                        x: [0.525, 0.55]
+                        y: 0.3
+                      elements:
+                      - Generator:             #text + img
+                          p: 0.5
+                          elements:
+                          - Image:
+                              files:
+                                path: resources/images
+                              size:
+                                height: [0.3, 0.4]
+                                width: [0.8, 0.9]
+                              position:
+                                x: center
+                                y: head
+                          - Text:
+                              size:
+                                height: [0.02, 0.05]
+                              text: Figure 0 - explanation
+                              w_border: [0, 0.05]
+                              font:
+                                bold: 0.5
+                                italic: 0.5
+                              position:
+                                x: center
+                                y: concatenate
+                          - TextGroup:
+                              font:
+                                size: [30, 50]
+                              h_border: [0.01, 0.15]
+                              w_border: [0.01, 0.05]
+                              size:
+                                width: 1
+                                height: fill
+
+                              position:
+                                x: head
+                                y: concatenate
+                              source_path: resources/texts/lorem_ipsum.txt
+                              spoilers:
+                                TextSpoiler:
+                                  p: 0.2
+                                  grey: [120, 200]
+                      - TextGroup:              # only text
+                          p: 0.5
+                          h_border: [0.01, 0.15]
+                          w_border: [0.01, 0.05]
                           size:
-                            width: [0.5, 0.8]
-                            height: 0.7
+                            width: 1
+                            height: 1
+
                           position:
-                            x: center
-                            y: [0.01, 0.1]
-                          text: "This is a title"
-                          font:
-                            name: ['Courier New', 'Arial']
-                            bold: 1
-                            size: fill
-                          v_align: bottom
-                          spoilers:
-                            Foreground:
-                              p: 0.2
-                              grey: [120,255]
-                              grid_ratio: 4
-                      - Text:
-                          size:
-                            width: [0.5, 0.8]
-                            height: [0.1, 0.2]
-                          position:
-                            x: center
-                            y: concatenate
-                          h_border: [0, 0.1]
-                          w_border: [0, 0.02]
-                          text: "This is a subtitle"
-                          font:
-                            bold: 0
-                            size: fill
-                            name: ['Courier New', 'Arial']
+                            x: head
+                            y: head
+                          source_path: resources/texts/lorem_ipsum.txt
                           spoilers:
                             TextSpoiler:
                               p: 0.2
                               grey: [120, 200]
-                      - Image:
-                          size:
-                            width: fill
-                            height: 0.8
-                          position:
-                            x: concatenate
-                            y: [0.01, 0.05]
-                          files:
-                            path: "resources/heading_stamps/"
-                            probabilities:
-                              github_logo: 0.25
-                              github-mark: 0.75
-                - Container:  # double column text + img / text + table
-                    size:
-                      width: 0.9
-                      height: fill
-                    position:
-                      x: center
-                      y: concatenate
-                    elements:
-                      - Generator:  # double column text + optional img
-                          p: 0.5
+              - Generator:          # text + table
+                  p: 0.5
+                  elements:
+                  - TextGroup:
+                      size:
+                        height: 0.4
+                      h_border: [0, 0.15]
+                      w_border: [0, 0.05]
 
-                          elements:
-                            - TextGroup: # text column 1
-                                h_border: [0, 0.15]
-                                w_border: [0, 0.05]
-                                size:
-                                  width: 0.45
-                                  height:
-                                    distribution: normal
-                                    mu: 0.8
-                                    sigma: 0.5
-                                    min: 0.5
-                                    max: 0.85
-                                position:
-                                  x: [0.025, 0.05]
-                                  y: head
-                                source_path: resources/texts/lorem_ipsum.txt
-                                font:
-                                  size: [30, 45]
-                                  italic: 0.2
-                                  name: ['Courier New', 'Arial']
+                      source_path: resources/texts/lorem_ipsum.txt
+                      font:
+                        size: [30, 45]
+                        italic: 0.2
+                        name: [Courier New, Arial, Times New Roman, Verdana, Georgia, Trebuchet MS]
+                        bold: 0.2
+                  - Table:
+                      position:
+                        x: center
+                        y: concatenate
+                      size:
+                        height: [0.4, 0.6]
+                      fix_keys_col: 0.5
+                      fix_rows: 0.7
+                      fix_cols: 0.7
+                      row_frame: 0.6
+                      col_frame: 0.7
+                      title: 0.3
+                      headers_file: resources/texts/tabletop_list.txt
+                      values_file: resources/texts/values.txt
+                      keys_file: resources/texts/key_list.txt
+                      keys_uppercase: 0.5
+                      font:
+                        size: [20, 60]
+                        bold: 0.2
+                        italic: 0.05
+                        name: [Times New Roman, Arial]
 
-                            - Container: # text col 2 + [img]
-                                size:
-                                  width: 0.45
-                                  height:
-                                    distribution: normal
-                                    mu: 0.8
-                                    sigma: 0.5
-                                    min: 0.3
-                                    max: 0.7
-                                position:
-                                  x: [0.525, 0.55]
-                                  y: 0.3
-                                elements:
-                                  - Generator: #text + img
-                                      p: 0.5
-                                      elements:
-                                        - Image:
-                                            files:
-                                              path: resources/images
-                                            size:
-                                              height: [0.3, 0.4]
-                                              width: [0.8, 0.9]
-                                            position:
-                                              x: center
-                                              y: head
-                                        - Text:
-                                            size:
-                                              height: [0.02, 0.05]
-                                            text: "Figure 0 - explanation"
-                                            w_border: [0, 0.05]
-                                            font:
-                                              bold: 0.5
-                                              italic: 0.5
-                                            position:
-                                              x: center
-                                              y: concatenate
-                                        - TextGroup:
-                                            font:
-                                              size: [30, 50]
-                                            h_border: [0.01, 0.15]
-                                            w_border: [0.01, 0.05]
-                                            size:
-                                              width: 1
-                                              height: fill
+                      cols: [4, 8]
+                      rows: [6, 20]
+                      w_border: [0.05, 0.15]
+                      h_border: [0.1, 0.2]
+                      cells_spoilers:
+                        Background:
+                          p: 0.1
+                          grey: [220, 240]
+                        InvertCellBackground:
+                          p: 0.05
+                      spoilers:
 
-                                            position:
-                                              x: head
-                                              y: concatenate
-                                            source_path: resources/texts/lorem_ipsum.txt
-                                            spoilers:
-                                              TextSpoiler:
-                                                p: 0.2
-                                                grey: [120, 200]
-                                  - TextGroup:  # only text
-                                      p: 0.5
-                                      h_border: [0.01, 0.15]
-                                      w_border: [0.01, 0.05]
-                                      size:
-                                        width: 1
-                                        height: 1
-
-                                      position:
-                                        x: head
-                                        y: head
-                                      source_path: resources/texts/lorem_ipsum.txt
-                                      spoilers:
-                                        TextSpoiler:
-                                          p: 0.2
-                                          grey: [120, 200]
-                      - Generator:  # text + table
-                          p: 0.5
-                          elements:
-                            - TextGroup:
-                                size:
-                                  height : 0.4
-                                h_border: [0, 0.15]
-                                w_border: [0, 0.05]
-
-                                source_path: resources/texts/lorem_ipsum.txt
-                                font:
-                                  size: [30, 45]
-                                  italic: 0.2
-                                  name: ['Courier New', 'Arial', 'Times New Roman', 'Verdana', 'Georgia', 'Trebuchet MS']
-                                  bold: 0.2
-                            - Table:
-                                position:
-                                  x: center
-                                  y: concatenate
-                                size:
-                                  height: [0.4, 0.6]
-                                fix_keys_col: 0.5
-                                fix_rows: 0.7
-                                fix_cols: 0.7
-                                row_frame: 0.6
-                                col_frame: 0.7
-                                title: 0.3
-                                headers_file: resources/texts/tabletop_list.txt
-                                values_file: resources/texts/values.txt
-                                keys_file: resources/texts/key_list.txt
-                                keys_uppercase: 0.5
-                                font:
-                                  size: [20, 60]
-                                  bold: 0.2
-                                  italic: 0.05
-                                  name: ['Times New Roman', 'Arial']
-
-                                cols: [4,8]
-                                rows: [6,20]
-                                w_border: [0.05, 0.15]
-                                h_border: [0.1, 0.2]
-                                cells_spoilers:
-                                  Background:
-                                    p: 0.1
-                                    grey: [220, 240]
-                                  InvertCellBackground:
-                                    p: 0.05
-                                spoilers:
-
-                                  Blur:
-                                    p: 0.2
-                                    r: 2
-                          spoilers:
-                            TextSpoiler:
-                              p: 0.2
-                              grey: [120, 200]
-          - Generator: # full text
-              p: 0.25
-              elements:
-                - TextGroup:
-                    h_border: [0, 0.05]
-                    w_border: [0, 0.05]
-                    size:
-                      height: [0.7, 0.95]
-                      width: [0.7, 0.95]
-                    position:
-                      x: center
-                      y: [head, center]
-                    source_path: resources/texts/lorem_ipsum.txt
-                    font:
-                      size: [20, 45]
-                      italic: 0.2
-                      bold: 0.2
-                      name: ['Courier New', 'Arial', 'Times New Roman', 'Verdana', 'Georgia', 'Trebuchet MS']
-                    spoilers:
-                      TextSpoiler:
-                        p: 0.2
-                        grey: [120, 200]
-                      Blur:
-                        p: 0.1
-                        r: [2,3]
-                - Text:
-                    size:
-                      width: 1
-                      height: 0.015
-                    text: "I am a footer.                             1/6"
-                    font:
-                      bold: 1
-                      italic: 1
-                    w_border: 0
-                    position:
-                      x: tail
-                      y: tail
-                    align: ['left','center', 'right']
+                        Blur:
+                          p: 0.2
+                          r: 2
+                  spoilers:
+                    TextSpoiler:
+                      p: 0.2
+                      grey: [120, 200]
+      - Generator:     # full text
+          p: 0.25
+          elements:
+          - TextGroup:
+              h_border: [0, 0.05]
+              w_border: [0, 0.05]
+              size:
+                height: [0.7, 0.95]
+                width: [0.7, 0.95]
+              position:
+                x: center
+                y: [head, center]
+              source_path: resources/texts/lorem_ipsum.txt
+              font:
+                size: [20, 45]
+                italic: 0.2
+                bold: 0.2
+                name: [Courier New, Arial, Times New Roman, Verdana, Georgia, Trebuchet MS]
+              spoilers:
+                TextSpoiler:
+                  p: 0.2
+                  grey: [120, 200]
+                Blur:
+                  p: 0.1
+                  r: [2, 3]
+          - Text:
+              size:
+                width: 1
+                height: 0.015
+              text: I am a footer.                             1/6
+              font:
+                bold: 1
+                italic: 1
+              w_border: 0
+              position:
+                x: tail
+                y: tail
+              align: [left, center, right]
   spoilers:
 #    Rotate:
 #      angle: [-3.0, 3.0]
@@ -337,10 +337,10 @@ Generator:
 
     Blur:
       p: 0.2
-      r: [2,3]
+      r: [2, 3]
     JPEGCompression:
       quality: [25, 60]
       subsampling: 1
 Exporters:
   #- CoupleExporter: ~
-  - GlobalExporter: ~
+- GlobalExporter:
