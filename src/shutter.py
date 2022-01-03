@@ -13,7 +13,7 @@ import yaml
 from exporter import from_options
 from generators.generator import Generator
 from progress_bar import ProgressBar
-from spoiler import Spoiler
+from spoilers.spoiler import Spoiler
 
 
 def config_logger(out_dir):

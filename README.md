@@ -3,6 +3,7 @@ TODO
 - separate spoilers
 - add docstrings
 - split readme
+- refactor text_spoiler without opencv
 # Shutter
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
@@ -43,6 +44,10 @@ run `pipenv run python src/shutter.py -h` to know supported args
 
 run `pipenv run python src/shutter.py --config $CONFIG_FILE --size $K --dir $PATH_TO_OUT_DIR [--workers N] [--out FILE_PREFIX]` to start the image generation
 
+### Known issues
+On Mac M1 there is a problem importing cv2 when spawn_context is `fork`, bypass error with:
+
+`OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES pipenv run python src/shutter.py --config $CONFIG_FILE --size $K --dir $PATH_TO_OUT_DIR [--workers N] [--out FILE_PREFIX]`
 # Docker image - RECOMMENDED
 The docker image is recommended for configurations using multiple fonts.
 It's built to use dumb-init to enable proper terminations of the workers. For more see https://github.com/Yelp/dumb-init
