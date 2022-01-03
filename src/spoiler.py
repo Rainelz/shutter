@@ -19,7 +19,7 @@ import PIL.ImageOps
 from dice_roller import get_value_generator
 from dice_roller import roll
 from dice_roller import roll_value
-from generators import Component
+from generators.component import Component
 from interfaces import Visitor
 
 

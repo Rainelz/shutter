@@ -11,7 +11,7 @@ import numpy.random as random
 import yaml
 
 from exporter import from_options
-from generators import Generator
+from generators.generator import Generator
 from progress_bar import ProgressBar
 from spoiler import Spoiler
 

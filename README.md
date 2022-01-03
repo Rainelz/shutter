@@ -1,6 +1,6 @@
 TODO
-- refactor to leverage 3.10 pattern matching
-- separate generators
+- refactor to leverage 3.10 pattern matching - PARTIAL
+- separate spoilers
 - add docstrings
 - split readme
 # Shutter
