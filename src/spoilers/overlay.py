@@ -10,7 +10,7 @@ class Overlay(AbstractFilter):
     """Random paste an image."""
 
     def __init__(self, path, size, probabilities=[], **kwargs):
-        super().__init__(**kwargs)
+        super(Overlay, self).__init__(**kwargs)
         self.path = Path(path)
         assert self.path.exists()
         self.probabilities = probabilities

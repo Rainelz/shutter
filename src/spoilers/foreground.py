@@ -14,7 +14,7 @@ class Foreground(AbstractFilter):
     DEF_GRID_RATIO = 2
 
     def __init__(self, grey=DEFAULT_GREY, grid_ratio=DEF_GRID_RATIO, **kwargs):
-        super().__init__(**kwargs)
+        super(Foreground, self).__init__(**kwargs)
         self.grey = grey
         self.grid_ratio = grid_ratio
 

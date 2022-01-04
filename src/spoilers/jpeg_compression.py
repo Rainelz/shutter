@@ -11,7 +11,7 @@ class JPEGCompression(AbstractFilter):
     """Apply a gradient foregound noise."""
 
     def __init__(self, quality=50, subsampling=-1, **kwargs):
-        super().__init__(**kwargs)
+        super(JPEGCompression, self).__init__(**kwargs)
         self.quality = quality
         self.subsampling = subsampling
 

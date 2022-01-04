@@ -12,7 +12,7 @@ class Blur(AbstractFilter):
     DEFAULT_R = 2
 
     def __init__(self, r=DEFAULT_R, **kwargs):
-        super().__init__(**kwargs)
+        super(Blur, self).__init__(**kwargs)
         self.r = r
 
     def run(self, image):

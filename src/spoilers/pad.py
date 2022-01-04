@@ -12,7 +12,7 @@ class Pad(AbstractFilter):
     DEFAULT_N = 2
 
     def __init__(self, n=DEFAULT_N, **kwargs):
-        super().__init__(**kwargs)
+        super(Pad, self).__init__(**kwargs)
         self.n = n
 
     def run(self, image):

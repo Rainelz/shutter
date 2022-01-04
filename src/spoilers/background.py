@@ -16,7 +16,7 @@ def _white_noise(width, height, gray_p, grid_ratio=2):
     pil_map = PIL.Image.new("L", (w, h), 255)
     values = get_value_generator(gray_p)
     random_grid = list(map(lambda x: int(next(values)), [0] * w * h))
-    pil_map.putdata(list(random_grid))
+    pil_map.putdata(random_grid)
 
     return pil_map.resize((width, height), PIL.Image.LINEAR)
 
@@ -28,7 +28,7 @@ class Background(AbstractFilter):
     DEF_GRID_RATIO = 2
 
     def __init__(self, grey=DEFAULT_GREY, grid_ratio=DEF_GRID_RATIO, **kwargs):
-        super().__init__(**kwargs)
+        super(Background, self).__init__(**kwargs)
         self.grey = grey
         self.grid_ratio = grid_ratio
 

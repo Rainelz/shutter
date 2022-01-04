@@ -9,7 +9,7 @@ class Crop(AbstractFilter):
     DEFAULT_BORDER = 0
 
     def __init__(self, border=DEFAULT_BORDER, **kwargs):
-        super().__init__(**kwargs)
+        super(Crop, self).__init__(**kwargs)
 
         self.border = border
 

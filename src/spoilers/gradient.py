@@ -7,7 +7,7 @@ class Gradient(AbstractFilter):
     """Apply a gradient foregound noise."""
 
     def __init__(self, gradient_magnitude=1.0, direction=0, color=0, **kwargs):
-        super().__init__(**kwargs)
+        super(Gradient, self).__init__(**kwargs)
         self.gradient_mg = gradient_magnitude
         self.direction = direction
         self.color = color

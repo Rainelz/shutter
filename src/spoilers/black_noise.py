@@ -11,7 +11,7 @@ class BlackNoise(AbstractFilter):
     """Create noise grid and apply to background of a cell of the table."""
 
     def __init__(self, ratio=0.05, **kwargs):
-        super().__init__(**kwargs)
+        super(BlackNoise, self).__init__(**kwargs)
         self.ratio = ratio
 
     def run(self, image):

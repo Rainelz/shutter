@@ -8,7 +8,7 @@ class Dilate(AbstractFilter):
     """Dilate black blobs in component."""
 
     def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+        super(Dilate, self).__init__(**kwargs)
         # self.morphs = [cv2.MORPH_RECT,cv2.MORPH_CROSS,cv2.MORPH_ELLIPSE]
 
     def get_kernel(self):

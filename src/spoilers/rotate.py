@@ -13,7 +13,7 @@ class Rotate(AbstractFilter):
     DEFAULT_ANGLE = 0
 
     def __init__(self, angle=DEFAULT_ANGLE, **kwargs):
-        super().__init__(**kwargs)
+        super(Rotate, self).__init__(**kwargs)
         self.angle = angle
 
     def center_box(self, outer, inner, c, s):

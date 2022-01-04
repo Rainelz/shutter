@@ -12,7 +12,7 @@ class TextSpoiler(AbstractFilter):
     """Dilate text and replace with grey."""
 
     def __init__(self, grey=127, dilate_k=3, **kwargs):
-        super().__init__(**kwargs)
+        super(TextSpoiler, self).__init__(**kwargs)
         self.grey = grey
         self.dilate_k = dilate_k
 

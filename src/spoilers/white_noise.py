@@ -11,7 +11,7 @@ class WhiteNoise(AbstractFilter):
     """Create noise mask and apply non white pixels."""
 
     def __init__(self, ratio=0.05, **kwargs):
-        super().__init__(**kwargs)
+        super(WhiteNoise, self).__init__(**kwargs)
         self.ratio = ratio
 
     def run(self, image):

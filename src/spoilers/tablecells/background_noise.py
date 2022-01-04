@@ -11,7 +11,7 @@ class CellBackground(AbstractFilter):
     """Create noise grid and apply to background of a cell of the table."""
 
     def __init__(self, grey=(220, 255), grid_ratio=2, **kwargs):
-        super().__init__(**kwargs)
+        super(CellBackground, self).__init__(**kwargs)
         self.grey = grey
         self.grid_ratio = grid_ratio
 

@@ -10,7 +10,7 @@ class SaltPepper(AbstractFilter):
     DEF_AMOUNT = 0.05
 
     def __init__(self, ratio=DEF_RATIO, amount=DEF_AMOUNT, **kwargs):
-        super().__init__(**kwargs)
+        super(SaltPepper, self).__init__(**kwargs)
         self.ratio = ratio
         self.amount = amount
 
