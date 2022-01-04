@@ -34,7 +34,7 @@ class LocalExporter(Visitor):
 
             assert file_name
             with open(self.path / f"{file_name}.json", "w") as f:
-                json.dump(data, f)
+                json.dump(data, f, indent=2)
 
         return data
 
@@ -49,7 +49,12 @@ class GlobalExporter(Visitor):
     ):
 
         self.depth += 1
-        data = {"type": component.type, "size": component.size, "elements": []}
+        data = {
+            "type": component.type,
+            "size": component.size,
+            "position": [],
+            "elements": [],
+        }
 
         for el, position in component.elements:
             x, y = position
@@ -66,7 +71,7 @@ class GlobalExporter(Visitor):
         if self.depth == 0:
             assert file_name
             with open(self.path / f"{file_name}.json", "w") as f:
-                json.dump(data, f)
+                json.dump(data, f, indent=2)
 
         return data
 

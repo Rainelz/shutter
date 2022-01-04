@@ -58,7 +58,7 @@ class Text(Generator):
                 l_height > height or l_width > width
             ):  # doesn't fit, go for filling. N.B. single line!
                 f_size = "fill"  #
-                logging.debug(f"Can't fit with font size {f_size}, filling...")
+                # logging.debug(f"Can't fit with font size {f_size}, filling...")
 
         if f_size == "fill":
             font_data.update({"filled": True})

@@ -2,8 +2,8 @@
 
 Generator:
   size:
-    width: 2479
-    height: 3508
+    width: 850
+    height: 1200
   elements:
   - Container:
       size:
@@ -34,7 +34,7 @@ Generator:
               keys_file: resources/texts/key_list.txt
               keys_uppercase: 0.5        # p of having key uppercase
               font:        # font data
-                size: [20, 60]
+                size: [12, 24]
                 bold: 0.2
                 name: [Times New Roman, Arial]
               cols: [4, 8]
@@ -146,7 +146,7 @@ Generator:
                         y: head
                       source_path: resources/texts/lorem_ipsum.txt
                       font:
-                        size: [30, 45]
+                        size: [12, 28]
                         italic: 0.2
                         name: [Courier New, Arial]
 
@@ -188,7 +188,7 @@ Generator:
                                 y: concatenate
                           - TextGroup:
                               font:
-                                size: [30, 50]
+                                size: [12, 28]
                               h_border: [0.01, 0.15]
                               w_border: [0.01, 0.05]
                               size:
@@ -205,6 +205,8 @@ Generator:
                                   grey: [120, 200]
                       - TextGroup:              # only text
                           p: 0.5
+                          font:
+                            size: [12, 28]
                           h_border: [0.01, 0.15]
                           w_border: [0.01, 0.05]
                           size:
@@ -230,7 +232,7 @@ Generator:
 
                       source_path: resources/texts/lorem_ipsum.txt
                       font:
-                        size: [30, 45]
+                        size: [12, 24]
                         italic: 0.2
                         name: [Courier New, Arial, Times New Roman, Verdana, Georgia, Trebuchet MS]
                         bold: 0.2
@@ -251,7 +253,7 @@ Generator:
                       keys_file: resources/texts/key_list.txt
                       keys_uppercase: 0.5
                       font:
-                        size: [20, 60]
+                        size: [12, 28]
                         bold: 0.2
                         italic: 0.05
                         name: [Times New Roman, Arial]
@@ -289,7 +291,7 @@ Generator:
                 y: [head, center]
               source_path: resources/texts/lorem_ipsum.txt
               font:
-                size: [20, 45]
+                size: [12, 28]
                 italic: 0.2
                 bold: 0.2
                 name: [Courier New, Arial, Times New Roman, Verdana, Georgia, Trebuchet MS]
@@ -337,7 +339,7 @@ Generator:
 
     Blur:
       p: 0.2
-      r: [2, 3]
+      r: [1, 2]
     JPEGCompression:
       quality: [25, 60]
       subsampling: 1
