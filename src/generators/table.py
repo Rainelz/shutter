@@ -16,7 +16,7 @@ from utils import roll_table_sizes
 class TableCell(Generator):
     # key_value_map = {'top': []}
     def __init__(self, opt):
-        super().__init__(opt)
+        super(TableCell, self).__init__(opt)
         self.headers_file = self.node.get("headers_file", None)
         self.w_border = self.node.get("w_border", 0)
         self.h_border = self.node.get("h_border", 0)
@@ -169,7 +169,7 @@ class TableCell(Generator):
 
 class Table(Generator):
     def __init__(self, opt):
-        super().__init__(opt)
+        super(Table, self).__init__(opt)
         self.cols = self.node.get("cols", 1)
         self.rows = self.node.get("rows", 1)
         # self.cell_size = self.node.get('cell_size', dict())

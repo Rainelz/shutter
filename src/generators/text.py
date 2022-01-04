@@ -17,7 +17,7 @@ class Text(Generator):
     style_map = {"bold": " Bold", "italic": " Italic"}
 
     def __init__(self, opt):
-        super().__init__(opt)
+        super(Text, self).__init__(opt)
         self.data_path = self.node.get("source_path", None)
         self.n_lines = self.node.get("n_lines", -1)
         self.font = self.node.get("font", dict())
@@ -150,7 +150,7 @@ class TextGroup(Generator):
     style_map = {"bold": " Bold", "italic": " Italic"}
 
     def __init__(self, opt):
-        super().__init__(opt)
+        super(TextGroup, self).__init__(opt)
         self.data_path = self.node.get("source_path", None)
         self.n_lines = self.node.get("n_lines", -1)
         self.font = self.node.get("font", dict())

@@ -16,6 +16,7 @@ class Component(BaseComponent):
     """
 
     def __init__(self, type, size, node, background_color=(255, 255, 255, 255)):
+        super(Component, self).__init__()
         if len(background_color) > 1:
             color_space = "RGB"
         else:
