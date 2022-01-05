@@ -1,9 +1,9 @@
 TODO
 - refactor to leverage 3.10 pattern matching - PARTIAL
-- separate spoilers
 - add docstrings
 - split readme
 - refactor text_spoiler without opencv
+
 # Shutter
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
@@ -21,6 +21,8 @@ Shutter generates by default 3 folders:
 4. a `config.yaml` file containing the parameters used for the generation (including the seed used to initialize the random state to enable determinism between runs).
 
 For more details about the exporters, see [Exporters](#exporters)
+### [BETA] Tutorial
+ Try the tutorial in Colab! [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1lgiolki8e104g-gLJ87Ol1PEh4m9cciC?usp=sharing)
 
 ## Requirements
 
@@ -110,7 +112,8 @@ Components can define where they should be placed in the image, and how big they
 `position` accepted values are:
 - `float` < 1 - to denote a value relative to it's parent considered axis
 - `int` - absolute value to fix position
-- `'concatenate'` to fill any empty space wrt the closest element on considered axis
+- `str` : `'head' | 'center' | 'tail' |'concatenate'`
+
 `size` accepted values are:
 - `float` < 1 - to denote a value relative to it's parent considered axis
 - `int` - absolute value to fix size
@@ -126,7 +129,7 @@ size:
   y : concatenate
 ```
 
-will place the object sized `(0.3*parent_width, parent_free_height)` top left corner at `(0.5 * parent_width, closest_free_parent_pixel)`
+will place the object sized `(0.3*parent_width, parent_free_height)` top left corner at `(0.5 * parent_width, parent_first_free_pixel)`
 
 ### Define Randomness
 
